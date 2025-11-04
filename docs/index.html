@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Argo log_MKE — plevel3 (month: May)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.css">
+  <script src="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.js"></script>
+  <link href="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.css" rel="stylesheet"/>
+  <link rel="icon" type="image/x-icon" href="/img/favicon/favicon.ico">
+  <link rel="shortcut icon" href="/img/favicon/favicon.ico">
+  
+  
+
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    .legend {
+      position:absolute; bottom:12px; left:12px; background:#fff; padding:8px 10px;
+      border-radius:6px; font: 13px/1.3 system-ui, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,.2);
+    }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="legend">
+  <div><strong>log_MKE monthly climatology</strong> (log(cm² s⁻²))</div>
+  <div>pressurelevel: 20.0 dbar (plevel3) • month: May</div>
+</div>
+
+<script>
+  const tilesURL = "./assets/tiles/plevel3_month4_logMKE/{z}/{x}/{y}.png";
+
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: 'https://demotiles.maplibre.org/style.json',
+    center: [0, 20],
+    zoom: 1.8,
+    antialias: true
+  });
+
+  map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+  map.on('style.load', () => {
+  // Force globe after style loads so styles can’t override it
+  if (map.setProjection) map.setProjection({ type: 'globe' });
+
+  if (map.setFog) map.setFog({ 'horizon-blend': 0.9 });
+
+  map.addSource('logmke', {
+    type: 'raster',
+    tiles: [tilesURL],
+    tileSize: 256,
+    scheme: 'tms',   // keep if your tiles are TMS
+    minzoom: 0,
+    maxzoom: 4
+  });
+  map.addLayer({
+    id: 'logmke',
+    type: 'raster',
+    source: 'logmke',
+    paint: { 'raster-opacity': 0.95, 'raster-resampling': 'nearest' }
+  });
+
+  map.easeTo({ pitch: 55, bearing: 20, duration: 1200 });
+  });
+
+  // Diagnostics (no `.name` here)
+  console.log('MapLibre', maplibregl.version);
+  console.log('WebGL2 available?', !!document.createElement('canvas').getContext('webgl2'));
+  console.log('Projection now:', map.getProjection ? map.getProjection() : '(no getProjection)');
+
+</script>
+</body>
+</html>
