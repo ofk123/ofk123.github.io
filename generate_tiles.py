@@ -11,7 +11,7 @@ def main():
     parser.add_argument("input_tif", help="Path to input GeoTIFF (single-band float data)")
     parser.add_argument("colormap_file", default="magma.txt", help="Path to colormap text file (e.g., magma.txt)")
     parser.add_argument("output_dir", help="Output directory for tiles (will be created if not exists)")
-    parser.add_argument("-z", "--zoom", default="0-4", help="Zoom levels to generate (default: 0-4)")
+    parser.add_argument("-z", "--zoom", default="0-3", help="Zoom levels to generate (default: 0-4)")
     args = parser.parse_args()
 
     tif_path = args.input_tif
@@ -29,8 +29,8 @@ def main():
     
     from pprint import pprint
     info_src = gdal.Info(ds, format='json')
-    print("\nSOURCE CRS:", info_src.get('coordinateSystem', {}).get('wkt', 'NONE'))
-    print("SOURCE corners:", info_src.get('cornerCoordinates', {}))
+    #print("\nSOURCE CRS:", info_src.get('coordinateSystem', {}).get('wkt', 'NONE'))
+    #print("SOURCE corners:", info_src.get('cornerCoordinates', {}))
 
 
     # 1. Translate the dataset to Byte type with scaling (vmin=-2, vmax=7 -> 1-255) and set NoData=0
