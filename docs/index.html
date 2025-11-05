@@ -6,11 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.css">
   <script src="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.js"></script>
-  <link href="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.css" rel="stylesheet"/>
+  <!-- <link href="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.css" rel="stylesheet"/> -->
   <link rel="icon" type="image/x-icon" href="/img/favicon/favicon.ico">
   <link rel="shortcut icon" href="/img/favicon/favicon.ico">
-  
-  
 
   <style>
     html, body, #map { height: 100%; margin: 0; }
@@ -25,17 +23,19 @@
 
 <div class="legend">
   <div><strong>log_MKE monthly climatology</strong> (log(cm² s⁻²))</div>
-  <div>pressurelevel: 20.0 dbar (plevel3) • month: May</div>
+  <div>pressurelevel: 20 dbar (plevel3) • month: May</div>
+  <img src="./assets/legend_logMKE_magma.png" alt="colorbar" style="width:260px; display:block; margin-top:6px">
 </div>
 
 <script>
-  const tilesURL = "./assets/tiles/plevel3_month4_logMKE/{z}/{x}/{y}.png";
+  const tilesURL = "./testdir/{z}/{x}/{y}.png";
 
   const map = new maplibregl.Map({
     container: 'map',
-    style: 'https://demotiles.maplibre.org/style.json',
+    style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
     center: [0, 20],
-    zoom: 1.8,
+    zoom: 1.0,
+    maxZoom: 8,     // let the camera zoom further
     antialias: true
   });
 
@@ -53,13 +53,13 @@
     tileSize: 256,
     scheme: 'tms',   // keep if your tiles are TMS
     minzoom: 0,
-    maxzoom: 4
+    maxzoom: 6
   });
   map.addLayer({
     id: 'logmke',
     type: 'raster',
     source: 'logmke',
-    paint: { 'raster-opacity': 0.95, 'raster-resampling': 'nearest' }
+    paint: { 'raster-opacity': 0.95, 'raster-resampling': 'linear' }
   });
 
   map.easeTo({ pitch: 55, bearing: 20, duration: 1200 });
