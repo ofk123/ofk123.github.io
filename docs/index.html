@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.css">
   <script src="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.js"></script>
-  <!-- <link href="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.css" rel="stylesheet"/> -->
   <link rel="icon" type="image/x-icon" href="/img/favicon/favicon.ico">
   <link rel="shortcut icon" href="/img/favicon/favicon.ico">
 
@@ -24,7 +23,7 @@
 <div class="legend">
   <div><strong>log_MKE monthly climatology</strong> (log(cm² s⁻²))</div>
   <div>pressurelevel: 20 dbar (plevel3) • month: May</div>
-  <img src="./assets/legend_logMKE_magma.png" alt="colorbar" style="width:260px; display:block; margin-top:6px">
+  <img src="./testdir/legend_logMKE_magma.png" alt="colorbar" style="width:260px; display:block; margin-top:6px">
 </div>
 
 <script>
@@ -35,14 +34,13 @@
     style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
     center: [0, 20],
     zoom: 1.0,
-    maxZoom: 8,     // let the camera zoom further
+    maxZoom: 8,   
     antialias: true
   });
 
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
   map.on('style.load', () => {
-  // Force globe after style loads so styles can’t override it
   if (map.setProjection) map.setProjection({ type: 'globe' });
 
   if (map.setFog) map.setFog({ 'horizon-blend': 0.9 });
@@ -51,7 +49,7 @@
     type: 'raster',
     tiles: [tilesURL],
     tileSize: 256,
-    scheme: 'tms',   // keep if your tiles are TMS
+    scheme: 'tms',
     minzoom: 0,
     maxzoom: 6
   });
@@ -65,7 +63,6 @@
   map.easeTo({ pitch: 55, bearing: 20, duration: 1200 });
   });
 
-  // Diagnostics (no `.name` here)
   console.log('MapLibre', maplibregl.version);
   console.log('WebGL2 available?', !!document.createElement('canvas').getContext('webgl2'));
   console.log('Projection now:', map.getProjection ? map.getProjection() : '(no getProjection)');
