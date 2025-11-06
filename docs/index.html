@@ -33,6 +33,30 @@
 
 <script>
 
+  // Read URL params and detect if page is in an iframe
+  const params = new URLSearchParams(location.search);
+  const isEmbedded = (window.self !== window.top);
+
+  // Parse zoom override (fallback: if embedded, use 0.2; else use your current 1.0)
+  const zoomParam = parseFloat(params.get('zoom'));
+  const initialZoom = Number.isFinite(zoomParam) ? zoomParam : (isEmbedded ? 0.2 : 1.0);
+
+  // Legend control: legend=off/0/false -> hide; legend=on/1/true -> show.
+  const legendParam = (params.get('legend') || '').toLowerCase();
+  const legendOff = ['off','0','false','no','hide'].includes(legendParam)
+                    || (isEmbedded && legendParam !== 'on'); // default to off when embedded
+
+  // Later, when you create the map, use initialZoom:
+  // const map = new maplibregl.Map({ ..., zoom: initialZoom, ... });
+
+  // After your legend element is created (or right after DOM), hide if requested:
+  document.addEventListener('DOMContentLoaded', () => {
+    if (legendOff) {
+      const legend = document.querySelector('.legend');
+      if (legend) legend.style.display = 'none';
+    }
+  });
+
   const months = [
     "January","February","March","April","May","June",
     "July","August","September","October","November","December"
@@ -53,10 +77,11 @@
     container: 'map',
     style: styleUrl,
     center: [0,0],
-    zoom: 1.0,
+    zoom: initialZoom,
     maxZoom: 8,
     antialias: true,
-    fadeDuration: 0
+    fadeDuration: 0,
+    attributionControl: true   // <-- turn off the default
   });
 
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
@@ -66,7 +91,7 @@
     if (map.setProjection) map.setProjection({ type: 'globe' });
 
     if (!map.getLayer('sky')) {
-      map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'gradient', 'sky-opacity': 0 }});
+      map.addLayer({ id: 'sky', type: 'background', paint: { 'sky-type': 'gradient', 'sky-opacity': 0 }});
     }
 
     map.getCanvas().style.background = 'transparent';
@@ -106,8 +131,16 @@
     requestAnimationFrame(spin);
 
     // Pause/resume rules
-    function pauseSpin()  { spinning = false; lastTS = 0; }
-    function resumeSpin() { spinning = true;  lastTS = 0; }
+    function pauseSpin()  { 
+      spinning = false; 
+      lastTS = 0; 
+    }
+    function resumeSpin() {
+      spinLat = map.getCenter().lat;
+      spinLng = map.getCenter().lng; 
+      spinning = true;  
+      lastTS = 0; 
+    }
     ['dragstart','mousedown','touchstart','wheel','rotatestart','pitchstart','zoomstart'].forEach(e =>
       map.on(e, pauseSpin)
     );

@@ -10,70 +10,84 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon/favicon-16x16.png">
     <link rel="manifest" href="/img/favicon/site.webmanifest">
     <title>Ola Formo Kihle - Scientific Data Consultant</title>
+    <style>
+      body {
+        background-color: #f9f9f9;  /* Off-white page background */
+        font-family: 'Arial', sans-serif;
+      }
+      img {
+        max-width: 100%;
+        max-height: 100%;
+      }
+      .text {
+        font-size: 10px;
+        /* Removed padding-left: 25px since Bootstrap grid provides spacing */
+      }
+      /* Center certain elements on smaller screens */
+      @media (max-width: 767px) {
+        #profile-pic, #tools-image {
+          display: block;
+          margin: 0 auto;
+        }
+        .contact-icons {
+          text-align: center;
+        }
+      }
+    </style>
 </head>
-
-<style>
-  .container {
-  display: flex;
-  align-items: center;
-  justify-content: start
-}
-
-img {
-  max-width: 100%;
-  max-height:100%;
-}
-
-.text {
-  font-size: 10.00px;
-  padding-left: 25.0px;
-  font-family: 'Arial';
-}
-</style>
-
-
 <body>
-<div class="text">
-  <h4>Ola Formo Kihle - Scientific Data Consultant</h4>
-</div>
-
-
-<div class="container">
-  <div class="image">
-    <img src="img/IMG_20240505_225507kopi.jpg" alt="me">
-  </div>
-  <div class="text">
-    Hi, thanks for stopping by!
-    <p>
-    I enjoy providing services within the area of scientific computing:
-    <ul style="list-style-type:square">
-    <li>writing scalable open-source frameworks for data-loading, -processing, and -storage, both on laptops and clouds, </il>
-    <li>data analysis and visualization,</il>
-    <li>troubleshooting open-source scientific workflows,</il>
-    <li>and more!</il>
-    </ul>
-    </p>
-    <p>
-    Tools used in past and present work:
-    </p>
-    <p>
-    <div class="image">
-      <img src="img/icons_jpg_cropped_svg_compressed_resized.svg" alt="ToolsIUse">
+  <div class="container">
+    <!-- Title Row -->
+    <div class="row">
+      <div class="col-xs-12">
+        <h4 class="text">Ola Formo Kihle - Scientific Data Consultant</h4>
+      </div>
     </div>
-    </p>
-    <p>
-    <a href="mailto:ola.formo.kihle@outlook.com"><img id="email" src="img/social/mail.svg" style="height:37px;width:auto;display:inline" alt="email icon" /></a>
-    <a href="tel:+4795068110"><img id="call" src="img/social/call.svg" style="height:37px;width:auto;display:inline" alt="call icon" /></a>
-    <a href="https://github.com/ofk123"><img id="github" src="img/social/github.svg" style="height:37px;width:auto;display:inline" alt="github icon" /></a>
-    <a href="https://discourse.pangeo.io/u/ofk123/summary"><img id="pangeo" src="img/social/Pangeo-Icon_BW.svg" style="height:37px;width:auto;display:inline" alt="pangeo icon" /></a>
-    </p>
-    <p>
-    Norwegian Org.nr.: 934 254 287<br>
-    </p>
+    <!-- Profile Image and Intro Text Row -->
+    <div class="row">
+      <div class="col-xs-12 col-sm-4">
+        <img id="profile-pic" src="img/IMG_20240505_225507kopi.jpg" alt="me" class="img-responsive">
+      </div>
+      <div class="col-xs-12 col-sm-8">
+        <p class="text">Hi, thanks for stopping by!</p>
+        <p class="text">I enjoy providing services within the area of scientific computing:</p>
+        <ul class="text" style="list-style-type:square;">
+          <li>writing scalable open-source frameworks for data-loading, -processing, and -storage, both on laptops and clouds</li>
+          <li>data analysis and visualization</li>
+          <li>troubleshooting open-source scientific workflows</li>
+          <li>and more!</li>
+        </ul>
+        <p class="text">Tools used in past and present work:</p>
+        <p><img id="tools-image" src="img/icons_jpg_cropped_svg_compressed_resized.svg" alt="ToolsIUse" class="img-responsive"></p>
+        <p class="contact-icons text">
+          <a href="mailto:ola.formo.kihle@outlook.com"><img id="email" src="img/social/mail.svg" style="height:37px;width:auto;display:inline;" alt="email icon" /></a>
+          <a href="tel:+4795068110"><img id="call" src="img/social/call.svg" style="height:37px;width:auto;display:inline;" alt="call icon" /></a>
+          <a href="https://github.com/ofk123"><img id="github" src="img/social/github.svg" style="height:37px;width:auto;display:inline;" alt="github icon" /></a>
+          <a href="https://discourse.pangeo.io/u/ofk123/summary"><img id="pangeo" src="img/social/Pangeo-Icon_BW.svg" style="height:37px;width:auto;display:inline;" alt="pangeo icon" /></a>
+        </p>
+        <p class="text">Norwegian Org.nr.: 934 254 287<br></p>
+      </div>
+    </div>
   </div>
-</div>
 
-
+  <!-- Map Section (wrapped in a responsive grid) -->
+  <section id="map-section" style="margin: 10px 0;">
+    <div class="container">
+      <div class="row">
+        <div class="col-xs-12 text-center">
+          <div id="mapContainer" style="padding:10px; display:inline-block;">
+            <iframe src="docs/index.html?zoom=-0.8&amp;legend=off" width="96%" height="100%" style="border:none;" allowfullscreen loading="lazy"></iframe>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-xs-12 text-center" style="margin:0px 0;">
+          <a href="docs" class="btn btn-primary btn-xs" target="_blank" rel="noopener">
+            Open <span class="glyphicon glyphicon-globe" aria-hidden="true"></span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
 </body>
-
 </html>
