@@ -78,7 +78,9 @@
     style: styleUrl,
     center: [0,0],
     zoom: initialZoom,
-    maxZoom: 8,
+    maxZoom: 3,
+    pitch: 2,
+    bearing: 23.5,
     antialias: true,
     fadeDuration: 0,
     attributionControl: true   // <-- turn off the default
@@ -124,7 +126,12 @@
         spinLng -= DEG_PER_SEC * dt;    // use -= to spin "eastward" visually
         if (spinLng > 180)  spinLng -= 360;
         if (spinLng < -180) spinLng += 360;
-        map.jumpTo({ center: [spinLng, spinLat], zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() });
+        map.jumpTo({
+          center: [spinLng, spinLat], 
+          zoom: map.getZoom(), 
+          pitch: map.getPitch(), 
+          bearing: map.getBearing() 
+        });
       }
       requestAnimationFrame(spin);
     }
@@ -159,7 +166,7 @@
         tileSize: 256,
         scheme: 'tms',
         minzoom: 0,
-        maxzoom: 6
+        maxzoom: 3
       });
       map.addLayer({
         id: f.id,
