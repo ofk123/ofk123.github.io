@@ -13,7 +13,7 @@
     <title>Ola Formo Kihle - Scientific Data Consultant</title>
     <style>
       body {
-        background-color: #f7f7fd;  /* Off-white page background */
+        background-color: #f6f6fc;  /* Off-white page background */
         font-family: 'Arial', sans-serif;
       }
       img {
@@ -25,6 +25,17 @@
         /* Removed padding-left: 25px since Bootstrap grid provides spacing */
       }
       /* Center certain elements on smaller screens */
+
+      #profile-pic{
+        display:block;
+        margin:0 auto;                 /* center on mobile */
+        width: clamp(120px, 28vw, 200px);
+        height:auto;                    /* preserve aspect ratio */
+      }
+
+      @media (min-width: 300px) {
+        #profile-pic { width: 45%; } /* adjust 85% to taste */
+      }
       @media (max-width: 767px) {
         #profile-pic, #tools-image {
           display: block;
@@ -34,22 +45,63 @@
           text-align: center;
         }
       }
+      @media (min-width: 1200px) {
+        #map-section .container { width: 1300px !important; } /* tweak 1280 → the width you prefer */
+      }
+
+      /* Unify the three blocks’ look */
+      .site-title { 
+        margin: 16px 0 10px;
+        font-size: clamp(10px, 1.9vw, 10px);
+        font-weight: 600;
+      }
+
+      .main-text,
+      .main-text p,
+      .main-text ul,
+      .footer-note {
+        font-size: 12px;          /* overrides your .text=10px inside the main block */
+        line-height: 1.55;
+        margin-bottom: 10px;
+      }
+
+      /* Slightly larger body text on tablets/desktops */
+      @media (min-width: 768px) {
+        .main-text,
+        .main-text p,
+        .main-text ul,
+        .footer-note { font-size: 10px; }
+      }
+
+      /* Center heading + blocks on phones, align with column on larger screens */
+      @media (max-width: 767px) {
+        .site-title, .main-text, .footer-note { text-align: center; }
+      }
+
+      
     </style>
 </head>
 <body>
   <div class="container">
     <!-- Title Row -->
     <div class="row">
-      <div class="col-xs-12">
-        <h4 class="text">Ola Formo Kihle - Scientific Data Consultant</h4>
+      <div class="col-xs-12 col-sm-8 col-sm-offset-4">
+        <h4 class="site-title">Ola Formo Kihle - Scientific Data Consultant</h4>
       </div>
     </div>
     <!-- Profile Image and Intro Text Row -->
     <div class="row">
       <div class="col-xs-12 col-sm-4">
-        <img id="profile-pic" src="img/IMG_20240505_225507kopi.jpg" alt="me" class="img-responsive">
+        <img 
+          id="profile-pic" 
+          src="img/IMG_20240505_225507kopi.jpg" 
+          alt="me" 
+          class="img-responsive"
+          loading="lazy"
+          decoding="async"
+        >
       </div>
-      <div class="col-xs-12 col-sm-8">
+      <div class="col-xs-12 col-sm-8 main-text">
         <p class="text">Hi, thanks for stopping by!</p>
         <p class="text">I enjoy providing services within the area of scientific computing:</p>
         <ul class="text" style="list-style-type:square;">
@@ -66,18 +118,27 @@
           <a href="https://github.com/ofk123"><img id="github" src="img/social/github.svg" style="height:37px;width:auto;display:inline;" alt="github icon" /></a>
           <a href="https://discourse.pangeo.io/u/ofk123/summary"><img id="pangeo" src="img/social/Pangeo-Icon_BW.svg" style="height:37px;width:auto;display:inline;" alt="pangeo icon" /></a>
         </p>
-        <p class="text">Norwegian Org.nr.: 934 254 287<br></p>
       </div>
     </div>
   </div>
+
+
+  
 
   <!-- Map Section (wrapped in a responsive grid) -->
   <section id="map-section" style="margin: 10px 0;">
     <div class="container">
       <div class="row">
         <div class="col-xs-12 text-center">
-          <div id="mapContainer" style="padding:10px; display:inline-block;">
-            <iframe src="docs/index.html?zoom=-0.8&amp;legend=off" width="96%" height="100%" style="border:none;" allowfullscreen loading="lazy"></iframe>
+          <div id="mapContainer" style="padding:4px; display:inline-block;">
+            <iframe 
+              src="docs/index.html?zoom=-0.8&amp;legend=off&amp;glow=on" 
+              width="100%" 
+              height="100%" 
+              style="border:none;" 
+              allowfullscreen 
+              loading="lazy">
+            </iframe>
           </div>
         </div>
       </div>
@@ -90,5 +151,13 @@
       </div>
     </div>
   </section>
+
+  <div class="container">
+    <div class="row">
+      <div class="col-xs-12 col-sm-8 col-sm-offset-4">
+        <p class="footer-note">Norwegian Org.nr.: 934 254 287</p>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

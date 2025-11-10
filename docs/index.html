@@ -19,6 +19,24 @@
       border-radius:6px; font: 13px/1.3 system-ui, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,.2);
     }
     .legend small { color:#505050; }
+    
+    #sun-glow {
+      position: fixed;              /* cover the viewport behind the map */
+      inset: 0;
+      background: radial-gradient(27% 33% at 50% 50%,
+        rgba(255,220,160,0.55) 0%,
+        rgba(255,190,120,0.35) 18%,
+        rgba(255,170,100,0.18) 32%,
+        rgba(255,140,80,0.10) 45%,
+        rgba(0,0,0,0) 62%);
+      filter: blur(8px);
+      z-index: 0;                   /* behind the map */
+      pointer-events: none;         /* don’t block map interaction */
+    }
+
+    /* Make sure stacking is correct */
+    #map { position: relative; z-index: 1; }
+    .legend { z-index: 2; }         /* legend floats above */
   </style>
 </head>
 <body>
@@ -37,7 +55,20 @@
   const params = new URLSearchParams(location.search);
   const isEmbedded = (window.self !== window.top);
 
-  // Parse zoom override (fallback: if embedded, use 0.2; else use your current 1.0)
+  // Glow control: default = ON when not embedded; OFF when embedded.
+  const glowParam = (params.get('glow') || '').toLowerCase();
+  const glowOn = glowParam
+    ? ['on','1','true','yes'].includes(glowParam)
+    : !isEmbedded;
+
+  // Insert the glow layer if active
+  if (glowOn) {
+    const glow = document.createElement('div');
+    glow.id = 'sun-glow';
+    document.body.appendChild(glow);
+  }
+
+  // Parse zoom override (fallback: if embedded, use 0.2; else use 1.0)
   const zoomParam = parseFloat(params.get('zoom'));
   const initialZoom = Number.isFinite(zoomParam) ? zoomParam : (isEmbedded ? 0.2 : 1.0);
 
@@ -46,10 +77,6 @@
   const legendOff = ['off','0','false','no','hide'].includes(legendParam)
                     || (isEmbedded && legendParam !== 'on'); // default to off when embedded
 
-  // Later, when you create the map, use initialZoom:
-  // const map = new maplibregl.Map({ ..., zoom: initialZoom, ... });
-
-  // After your legend element is created (or right after DOM), hide if requested:
   document.addEventListener('DOMContentLoaded', () => {
     if (legendOff) {
       const legend = document.querySelector('.legend');
@@ -80,10 +107,10 @@
     zoom: initialZoom,
     maxZoom: 3,
     pitch: 2,
-    bearing: 23.5,
+    bearing: 8.75,
     antialias: true,
     fadeDuration: 0,
-    attributionControl: true   // <-- turn off the default
+    attributionControl: true 
   });
 
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
@@ -92,8 +119,30 @@
     
     if (map.setProjection) map.setProjection({ type: 'globe' });
 
-    if (!map.getLayer('sky')) {
-      map.addLayer({ id: 'sky', type: 'background', paint: { 'sky-type': 'gradient', 'sky-opacity': 0 }});
+    try {
+      if (!map.getLayer('sky')) {
+        map.addLayer({
+          id: 'sky',
+          type: 'sky',
+          paint: {
+            'sky-type': 'gradient',
+            'sky-gradient': [
+              'interpolate', ['linear'], ['sky-radial-progress'],
+              0.0, 'rgb(0,0,0)',
+              1.0, 'rgb(8,10,16)'
+            ],
+            'sky-gradient-center': [0, 0],
+            'sky-gradient-radius': 1,
+            'sky-opacity': 1
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Sky layer not supported; using transparent map background.', e);
+      // Make the style’s background transparent so page background shows through
+      const bg = (map.getStyle().layers || []).find(l => l.type === 'background');
+      if (bg) map.setPaintProperty(bg.id, 'background-color', 'rgba(0,0,0,0)');
+      map.getCanvas().style.background = 'transparent';
     }
 
     map.getCanvas().style.background = 'transparent';
@@ -112,7 +161,7 @@
       }
     });
 
-    // --- Spin around polar axis w/ constant angular speed
+    // Spin around polar axis w/ constant angular speed
     const DEG_PER_SEC = 20;  
     let spinning = true;
     let spinLat = map.getCenter().lat;
