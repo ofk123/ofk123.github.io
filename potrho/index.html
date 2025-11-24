@@ -1,0 +1,270 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Monthly climatology potential density Argo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.css">
+  <script src="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.js"></script>
+  <link rel="icon" type="image/x-icon" href="/img/favicon/favicon.ico">
+  <link rel="shortcut icon" href="/img/favicon/favicon.ico">
+
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    body {
+      background: #000 center/cover no-repeat fixed;
+    }
+    .legend {
+      position:absolute; bottom:12px; left:12px; background:#fff; padding:8px 10px;
+      border-radius:6px; font: 13px/1.3 system-ui, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,.2);
+    }
+    .legend small { color:#505050; }
+    
+    #sun-glow {
+      position: fixed;              /* cover the viewport behind the map */
+      inset: 0;
+      background: radial-gradient(27% 33% at 50% 50%,
+        rgba(255,220,160,0.55) 0%,
+        rgba(255,190,120,0.35) 18%,
+        rgba(255,170,100,0.18) 32%,
+        rgba(255,140,80,0.10) 45%,
+        rgba(0,0,0,0) 62%);
+      filter: blur(8px);
+      z-index: 0;                   /* behind the map */
+      pointer-events: none;         /* don’t block map interaction */
+    }
+
+    /* Make sure stacking is correct */
+    #map { position: relative; z-index: 1; }
+    .legend { z-index: 2; }         /* legend floats above */
+  </style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="legend">
+  <div>Potential Density, monthly climatology</div>
+  <strong><div id="legend-month">month: January</div></strong>
+  <div>pressurelevel: 10 dbar (plevel2)</div>
+  <img src="./legend_potrho_viridis_r.png" alt="colorbar" style="width:260px; display:block; margin-top:6px">
+</div>
+
+<script>
+
+  // Read URL params and detect if page is in an iframe
+  const params = new URLSearchParams(location.search);
+  const isEmbedded = (window.self !== window.top);
+
+  // Glow control: default = ON when not embedded; OFF when embedded.
+  const glowParam = (params.get('glow') || '').toLowerCase();
+  const glowOn = glowParam
+    ? ['on','1','true','yes'].includes(glowParam)
+    : !isEmbedded;
+
+  // Insert the glow layer if active
+  if (glowOn) {
+    const glow = document.createElement('div');
+    glow.id = 'sun-glow';
+    document.body.appendChild(glow);
+  }
+
+  // Parse zoom override (fallback: if embedded, use 0.2; else use 1.0)
+  const zoomParam = parseFloat(params.get('zoom'));
+  const initialZoom = Number.isFinite(zoomParam) ? zoomParam : (isEmbedded ? 0.2 : 1.0);
+
+  // Legend control: legend=off/0/false -> hide; legend=on/1/true -> show.
+  const legendParam = (params.get('legend') || '').toLowerCase();
+  const legendOff = ['off','0','false','no','hide'].includes(legendParam)
+                    || (isEmbedded && legendParam !== 'on'); // default to off when embedded
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (legendOff) {
+      const legend = document.querySelector('.legend');
+      if (legend) legend.style.display = 'none';
+    }
+  });
+
+  const months = [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December"
+  ];
+
+  const frames = Array.from({length: 12}, (_, i) => {
+    const n = String(i + 1).padStart(2, "0"); // '01'..'12'
+    return {
+      id: `potrho_${n}`,
+      tilesURL: `./tiles/plevel2_month${n}/{z}/{x}/{y}.png`,
+      label: `frame: ${i+1} / 12`,
+      month: months[i],
+    };
+  });
+
+  const styleUrl = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: styleUrl,
+    center: [0,0],
+    zoom: initialZoom,
+    maxZoom: 5,
+    pitch: 2,
+    bearing: 8.75,
+    antialias: true,
+    fadeDuration: 0,
+    attributionControl: true 
+  });
+
+  map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+  map.on('style.load', () => {
+    
+    if (map.setProjection) map.setProjection({ type: 'globe' });
+
+    try {
+      if (!map.getLayer('sky')) {
+        map.addLayer({
+          id: 'sky',
+          type: 'sky',
+          paint: {
+            'sky-type': 'gradient',
+            'sky-gradient': [
+              'interpolate', ['linear'], ['sky-radial-progress'],
+              0.0, 'rgb(0,0,0)',
+              1.0, 'rgb(8,10,16)'
+            ],
+            'sky-gradient-center': [0, 0],
+            'sky-gradient-radius': 1,
+            'sky-opacity': 1
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Sky layer not supported; using transparent map background.', e);
+      // Make the style’s background transparent so page background shows through
+      const bg = (map.getStyle().layers || []).find(l => l.type === 'background');
+      if (bg) map.setPaintProperty(bg.id, 'background-color', 'rgba(0,0,0,0)');
+      map.getCanvas().style.background = 'transparent';
+    }
+
+    map.getCanvas().style.background = 'transparent';
+
+    if (map.setFog) map.setFog({ 'horizon-blend': 1.0 });
+
+    // Hide all labels/symbols from basemap
+    const layers = map.getStyle().layers || [];
+    layers.forEach(l => {
+      if (l.type === 'line') map.setLayoutProperty(l.id, 'visibility', 'none');
+      if (l.type === 'symbol') {
+        map.setLayoutProperty(l.id, 'visibility', 'none');
+      }
+      if (l.type === 'fill' && /land|background/i.test(l.id)) {
+        try { map.setPaintProperty(l.id, 'fill-color', '#0b0b0f'); } catch(e){}
+      }
+    });
+
+    // Spin around polar axis w/ constant angular speed
+    const DEG_PER_SEC = 20;  
+    let spinning = true;
+    let spinLat = map.getCenter().lat;
+    let spinLng = map.getCenter().lng;
+    let lastTS = 0;
+    function spin(ts) {
+      if (!lastTS) lastTS = ts;
+      const dt = (ts - lastTS) / 1000;
+      lastTS = ts;
+      if (spinning) {
+        spinLng -= DEG_PER_SEC * dt;    // use -= to spin "eastward" visually
+        if (spinLng > 180)  spinLng -= 360;
+        if (spinLng < -180) spinLng += 360;
+        map.jumpTo({
+          center: [spinLng, spinLat], 
+          zoom: map.getZoom(), 
+          pitch: map.getPitch(), 
+          bearing: map.getBearing() 
+        });
+      }
+      requestAnimationFrame(spin);
+    }
+    requestAnimationFrame(spin);
+
+    // Pause/resume rules
+    function pauseSpin()  { 
+      spinning = false; 
+      lastTS = 0; 
+    }
+    function resumeSpin() {
+      spinLat = map.getCenter().lat;
+      spinLng = map.getCenter().lng; 
+      spinning = true;  
+      lastTS = 0; 
+    }
+    ['dragstart','mousedown','touchstart','wheel','rotatestart','pitchstart','zoomstart'].forEach(e =>
+      map.on(e, pauseSpin)
+    );
+    map.on('idle', resumeSpin);
+    document.addEventListener('visibilitychange', () => {
+      spinning = (document.visibilityState === 'visible');
+      lastTS = 0;
+    });
+
+
+
+    frames.forEach((f, idx) => {
+      map.addSource(f.id, {
+        type: 'raster',
+        tiles: [f.tilesURL],
+        tileSize: 256,
+        scheme: 'tms',
+        minzoom: 0,
+        maxzoom: 5
+      });
+      map.addLayer({
+        id: f.id,
+        type: 'raster',
+        source: f.id,
+        paint: {
+          'raster-opacity': idx === 0 ? 1 : 0,
+          'raster-resampling': 'linear',
+          'raster-fade-duration': 0,
+          'raster-opacity-transition': { duration: 0, delay: 0 }
+        }
+      });
+    });
+
+    const monthEl = document.getElementById('legend-month');
+    function updateLegend(i) {
+      monthEl.textContent = `month: ${frames[i].month}`;
+    }
+    updateLegend(0);
+
+    let cur = 0;
+    const nextIndex     = i => (i + 1) % frames.length;
+    const nextnextIndex = i => (i + 2) % frames.length;
+
+    // Prewarm helper
+    const prewarm = (idx) => {
+      map.setPaintProperty(frames[idx].id, 'raster-opacity', 0.001);
+    };
+    prewarm(nextIndex(cur));
+
+    // Play loop
+    const fps = 3;
+    setInterval(() => {
+      const next = nextIndex(cur);
+      const nn   = nextnextIndex(cur);
+      map.setPaintProperty(frames[next].id, 'raster-opacity', 1);
+      map.setPaintProperty(frames[cur].id,  'raster-opacity', 0);
+      updateLegend(next);
+      prewarm(nn);
+
+      cur = next;
+    }, 1000 / fps);
+
+    // Diagnostics
+    console.log('MapLibre', maplibregl.version);
+    console.log('WebGL2 available?', !!document.createElement('canvas').getContext('webgl2'));
+    console.log('Projection now:', map.getProjection ? map.getProjection() : '(no getProjection)');
+  });
+</script>
+
+</body>
+</html>
