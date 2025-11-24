@@ -34,13 +34,15 @@ def main():
 
 
     # 1. Translate the dataset to Byte type with scaling (vmin=-2, vmax=7 -> 1-255) and set NoData=0
+    vmin=1021.5
+    vmax=1027.5
     src_nd = ds.GetRasterBand(1).GetNoDataValue()
     print("src_nd:", src_nd)
     if src_nd is not None:
         translate_opts = gdal.TranslateOptions(
             format='MEM', 
             outputType=gdal.GDT_Byte,
-            scaleParams=[[-2, 7, 1, 255]],
+            scaleParams=[[vmin, vmax, 1, 255]],
             noData=0,
             srcNodata=src_nd,       # map only true nodata
             dstNodata=0          
@@ -49,7 +51,7 @@ def main():
         translate_opts = gdal.TranslateOptions(
             format='MEM', 
             outputType=gdal.GDT_Byte, 
-            scaleParams=[[-2, 7, 1, 255]],
+            scaleParams=[[vmin, vmax, 1, 255]],
             noData=0,
         )
     
@@ -73,7 +75,7 @@ def main():
         colorSelection='nearest_color_entry',
         format='MEM'
     )
-    print("Applying color relief (magma colormap) to create RGBA raster...")
+    print("Applying color relief (colormap) to create RGBA raster...")
     color_ds = gdal.DEMProcessing('', scaled_ds, 'color-relief', options=demproc_opts)
     if color_ds is None:
         raise RuntimeError("Color-relief processing failed.")
@@ -91,7 +93,8 @@ def main():
     src_ds = gdal.Open(tif_path, gdal.GA_ReadOnly)          # keep a ref!
     if src_ds is None:
         raise RuntimeError(f"Failed to re-open source: {tif_path}")
-
+    
+    print("src_ds.RasterCount: ", src_ds.RasterCount)
     if src_ds.RasterCount == 1:
         src_arr = src_ds.GetRasterBand(1).ReadAsArray()
         valid_alpha = np.where(np.isfinite(src_arr), 255, 0).astype(np.uint8)
