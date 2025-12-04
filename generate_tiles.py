@@ -9,7 +9,7 @@ gdal.UseExceptions()
 def main():
     parser = argparse.ArgumentParser(description="Apply colormap and generate tiles from a GeoTIFF.")
     parser.add_argument("input_tif", help="Path to input GeoTIFF (single-band float data)")
-    parser.add_argument("colormap_file", default="magma.txt", help="Path to colormap text file (e.g., magma.txt)")
+    parser.add_argument("colormap_file", default="viridis_r.txt", help="Path to colormap text file (e.g., magma.txt)")
     parser.add_argument("output_dir", help="Output directory for tiles (will be created if not exists)")
     parser.add_argument("-z", "--zoom", default="0-3", help="Zoom levels to generate (default: 0-4)")
     args = parser.parse_args()
