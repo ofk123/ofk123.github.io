@@ -115,6 +115,106 @@
 
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
+  // Build simple lat/lon grid as GeoJSON
+  function buildGraticule(stepDeg = 30, densifyDeg = 1) {
+    const features = [];
+
+    // Meridians (constant lon, vary lat)
+    for (let lon = -180; lon <= 180; lon += stepDeg) {
+      const coords = [];
+      for (let lat = -90; lat <= 90; lat += densifyDeg) {
+        coords.push([lon, lat]);
+      }
+      features.push({
+        type: "Feature",
+        geometry: { type: "LineString", coordinates: coords },
+        properties: { kind: "meridian", lon }
+      });
+    }
+
+    // Parallels (constant lat, vary lon)
+    for (let lat = -90; lat <= 90; lat += stepDeg) {
+      const coords = [];
+      for (let lon = -180; lon <= 180; lon += densifyDeg) {
+        coords.push([lon, lat]);
+      }
+      features.push({
+        type: "Feature",
+        geometry: { type: "LineString", coordinates: coords },
+        properties: { kind: "parallel", lat }
+      });
+    }
+
+    return {
+      type: "FeatureCollection",
+      features
+    };
+  }
+
+
+    // Format helpers for labels
+  function formatLat(lat) {
+    const abs = Math.abs(lat);
+    if (lat > 0) return `${abs}°N`;
+    if (lat < 0) return `${abs}°S`;
+    return `0°`;
+  }
+
+  function formatLon(lon) {
+    const abs = Math.abs(lon);
+    if (lon > 0) return `${abs}°E`;
+    if (lon < 0) return `${abs}°W`;
+    return `0°`;
+  }
+
+  // Build label points for some lat/lon lines
+  function buildGraticuleLabels(stepDeg = 30) {
+    const features = [];
+
+    // Latitude labels on the prime meridian (lon = 0)
+    for (let lat = -60; lat <= 60; lat += stepDeg) {
+      if (lat === 0) continue; // we'll label lon=0 at the equator instead
+      features.push({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [0, lat]
+        },
+        properties: {
+          kind: 'latitude',
+          lat,
+          label: formatLat(lat)
+        }
+      });
+    }
+
+    // Longitude labels on the equator (lat = 0)
+    for (let lon = -180; lon < 180; lon += stepDeg) {
+      if (lon === 0) continue; // avoid duplicate 0° label
+      features.push({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [lon, 0]
+        },
+        properties: {
+          kind: 'longitude',
+          lon,
+          label: formatLon(lon)
+        }
+      });
+    }
+
+    return {
+      type: 'FeatureCollection',
+      features
+    };
+  }
+
+
+
+
+
   map.on('style.load', () => {
     
     if (map.setProjection) map.setProjection({ type: 'globe' });
@@ -160,6 +260,7 @@
         try { map.setPaintProperty(l.id, 'fill-color', '#0b0b0f'); } catch(e){}
       }
     });
+
 
     // Spin around polar axis w/ constant angular speed
     const DEG_PER_SEC = 20;  
@@ -263,6 +364,64 @@
     console.log('MapLibre', maplibregl.version);
     console.log('WebGL2 available?', !!document.createElement('canvas').getContext('webgl2'));
     console.log('Projection now:', map.getProjection ? map.getProjection() : '(no getProjection)');
+
+    // === Add lat/lon gridlines (graticule) ===
+    map.addSource('graticule', {
+      type: 'geojson',
+      data: buildGraticule(30, 1)  // 30° grid, 1° sampling
+    });
+
+    map.addLayer({
+      id: 'graticule-lines',
+      type: 'line',
+      source: 'graticule',
+      layout: {
+        'line-cap': 'round',
+        'line-join': 'round'
+      },
+      paint: {
+        'line-color': 'rgba(255,255,255,0.25)',
+        'line-width': [
+          'interpolate', ['linear'], ['zoom'],
+          0, 0.5,   // at zoom 0
+          2, 1.0,   // at zoom 2
+          5, 2.0    // at zoom 5
+        ]
+      }
+    });
+
+        // === Add degree labels for graticule ===
+    map.addSource('graticule-labels', {
+      type: 'geojson',
+      data: buildGraticuleLabels(30)  // match your grid step
+    });
+
+    map.addLayer({
+      id: 'graticule-labels',
+      type: 'symbol',
+      source: 'graticule-labels',
+      layout: {
+        'text-field': ['get', 'label'],
+        'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+        'text-size': [
+          'interpolate', ['linear'], ['zoom'],
+          0, 8,
+          2, 10,
+          5, 12
+        ],
+        'text-anchor': 'center',
+        'text-allow-overlap': false
+      },
+      paint: {
+        'text-color': 'rgba(255,255,255,0.85)',
+        'text-halo-color': 'rgba(0,0,0,0.7)',
+        'text-halo-width': 1.2
+      }
+    });
+
+
+
+
   });
 </script>
 
