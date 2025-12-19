@@ -85,11 +85,11 @@
       }
     });
 
-    // Spinning globe (quarter speed)
+    // Spinning globe
     const DEG_PER_SEC = 3.75;
     let spinning = true;
-    let spinLng = map.getCenter().lng;
-    let spinLat = map.getCenter().lat;
+    let spinLng = 0;
+    const spinLat = -90;  // Fixed at South Pole
     let lastTS = 0;
 
     function spin(ts) {
@@ -107,8 +107,8 @@
 
     function pauseSpin() { spinning = false; lastTS = 0; }
     function resumeSpin() {
-      spinLat = map.getCenter().lat;
       spinLng = map.getCenter().lng;
+      // Don't update spinLat - keep it at -90
       spinning = true;
       lastTS = 0;
     }
