@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Layer Thickness - Southern Ocean</title>
+  <title>Delta pressure - Southern Ocean</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.css">
   <script src="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.js"></script>
@@ -29,10 +29,10 @@
 <div id="map"></div>
 
 <div class="legend">
-  <strong>Layer Thickness</strong>
+  <strong>Delta-pressure for 1027.60 and 1027.61</strong>
   <div id="legend-month">Month: January</div>
   <div>Units: dbar</div>
-  <div style="margin-top:6px; height:12px; width:200px; background: linear-gradient(to right, #440154, #482777, #3e4a89, #31688e, #26838e, #1f9e89, #6cce5a, #b6de2b, #fee825);"></div>
+  <div style="margin-top:6px; height:12px; width:200px; background: linear-gradient(to right, #fee825, #b6de2b, #6cce5a, #1f9e89, #26838e, #31688e, #3e4a89, #482777, #440154);"></div>
   <div style="display:flex; justify-content:space-between; font-size:11px;"><span>0</span><span>37</span></div>
 </div>
 
@@ -45,7 +45,7 @@
   const TILE_SERVER = "https://deltapres-tiles.onrender.com";
 
   function getTileUrl(month) {
-    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&style=raster/viridis&colorscalerange=0,37&width=256&height=256`;
+    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&style=raster/viridis_r&colorscalerange=0,37&width=256&height=256`;
   }
 
   const map = new maplibregl.Map({
