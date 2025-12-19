@@ -32,7 +32,7 @@
   <strong>Layer Thickness</strong>
   <div id="legend-month">Month: January</div>
   <div>Units: dbar</div>
-  <div style="margin-top:6px; height:12px; width:200px; background: linear-gradient(to right, #440154, #482777, #3e4a89, #31688e, #26838e, #1f9e89, #6cce5a, #b6de2b, #fee825);"></div>
+  <div style="margin-top:6px; height:12px; width:200px; background: linear-gradient(to right, #2a186c, #14439c, #206e8b, #3d9e87, #89d0a4, #e6f598);"></div>
   <div style="display:flex; justify-content:space-between; font-size:11px;"><span>0</span><span>40</span></div>
 </div>
 
@@ -46,7 +46,7 @@
   const TILE_SERVER = "https://deltapres-tiles.onrender.com";
 
   function getTileUrl(month) {
-    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&style=raster/viridis&colorscalerange=0,40&width=256&height=256`;
+    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&style=raster/haline_r&colorscalerange=0,37&width=256&height=256`;
   }
 
   const map = new maplibregl.Map({
