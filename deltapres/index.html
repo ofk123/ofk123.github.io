@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Delta-pressure - Southern Ocean</title>
+  <title>Layer Thickness - Southern Ocean</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.css">
   <script src="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.js"></script>
@@ -29,11 +29,11 @@
 <div id="map"></div>
 
 <div class="legend">
-  <strong>Delta-pressure between isopycnals 1027.61 & 1027.60</strong>
+  <strong>Layer Thickness</strong>
   <div id="legend-month">Month: January</div>
   <div>Units: dbar</div>
-  <div style="margin-top:6px; height:12px; width:200px; background: linear-gradient(to right, #00204d, #414287, #7b78a8, #b4b4c8, #fee838);"></div>
-  <div style="display:flex; justify-content:space-between; font-size:11px;"><span>0</span><span>40</span></div>
+  <div style="margin-top:6px; height:12px; width:200px; background: linear-gradient(to right, #440154, #482777, #3e4a89, #31688e, #26838e, #1f9e89, #6cce5a, #b6de2b, #fee825);"></div>
+  <div style="display:flex; justify-content:space-between; font-size:11px;"><span>0</span><span>37</span></div>
 </div>
 
 <script>
@@ -42,11 +42,10 @@
     "July","August","September","October","November","December"
   ];
 
-  // UPDATE THIS to your actual Render.com URL
   const TILE_SERVER = "https://deltapres-tiles.onrender.com";
 
   function getTileUrl(month) {
-    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&style=raster/cividis&colorscalerange=0,37&width=256&height=256`;
+    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&style=raster/viridis&colorscalerange=0,37&width=256&height=256`;
   }
 
   const map = new maplibregl.Map({
@@ -65,30 +64,9 @@
 
   map.on('style.load', () => {
     if (map.setProjection) map.setProjection({ type: 'globe' });
-
-    try {
-      map.addLayer({
-        id: 'sky',
-        type: 'sky',
-        paint: {
-          'sky-type': 'gradient',
-          'sky-gradient': [
-            'interpolate', ['linear'], ['sky-radial-progress'],
-            0.0, 'rgb(0,0,0)',
-            1.0, 'rgb(8,10,16)'
-          ],
-          'sky-gradient-center': [0, 0],
-          'sky-gradient-radius': 1,
-          'sky-opacity': 1
-        }
-      });
-    } catch (e) {
-      console.warn('Sky layer not supported', e);
-    }
-
-    map.getCanvas().style.background = 'transparent';
     if (map.setFog) map.setFog({ 'horizon-blend': 1.0 });
 
+    // Hide basemap labels and lines
     (map.getStyle().layers || []).forEach(l => {
       if (l.type === 'line') map.setLayoutProperty(l.id, 'visibility', 'none');
       if (l.type === 'symbol') map.setLayoutProperty(l.id, 'visibility', 'none');
@@ -97,7 +75,7 @@
       }
     });
 
-    // Spinning globe
+    // Spinning globe (quarter speed)
     const DEG_PER_SEC = 3.75;
     let spinning = true;
     let spinLng = map.getCenter().lng;
