@@ -61,11 +61,11 @@
   const map = new maplibregl.Map({
     container: 'map',
     style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-    center: [0, -70],
+    center: [0, -90],  // South Pole
     zoom: 1.0,
     maxZoom: 6,
-    pitch: 2,
-    bearing: 8.75,
+    pitch: 0,          // Looking straight down (0 = top-down, no tilt)
+    bearing: 0,        // North up
     antialias: true,
     fadeDuration: 0
   });
