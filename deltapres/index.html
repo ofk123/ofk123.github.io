@@ -51,10 +51,11 @@
     "192": "#3b528b", "208": "#424186", "224": "#472d7b", "240": "#48186a",
     "255": "#440154"
   };
+
   const colormapParam = encodeURIComponent(JSON.stringify(viridisR));
 
   function getTileUrl(month) {
-    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&colormap=viridis_r&colorscalerange=0,37&width=256&height=256`;
+    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&style=raster/custom&colormap=${colormapParam}&colorscalerange=0,37&width=256&height=256`;
   }
 
   const map = new maplibregl.Map({
