@@ -1,0 +1,168 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Layer Thickness - Southern Ocean</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.css">
+  <script src="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.js"></script>
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    body { background: #000; }
+    
+    .legend {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: rgba(255,255,255,0.9);
+      padding: 10px 14px;
+      border-radius: 6px;
+      font: 13px/1.4 system-ui, sans-serif;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+      z-index: 2;
+    }
+    .legend strong { font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="legend">
+  <strong>Layer Thickness</strong>
+  <div id="legend-month">Month: January</div>
+  <div>Units: dbar</div>
+  <div style="margin-top:6px; height:12px; width:200px; background: linear-gradient(to right, #440154, #482777, #3e4a89, #31688e, #26838e, #1f9e89, #6cce5a, #b6de2b, #fee825);"></div>
+  <div style="display:flex; justify-content:space-between; font-size:11px;"><span>0</span><span>40</span></div>
+</div>
+
+<script>
+  const months = [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December"
+  ];
+
+  // UPDATE THIS to your actual Render.com URL
+  const TILE_SERVER = "https://deltapres-tiles.onrender.com";
+
+  function getTileUrl(month) {
+    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&style=raster/viridis&colorscalerange=0,40&width=256&height=256`;
+  }
+
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+    center: [0, -50],
+    zoom: 1.0,
+    maxZoom: 6,
+    pitch: 2,
+    bearing: 8.75,
+    antialias: true,
+    fadeDuration: 0
+  });
+
+  map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+  map.on('style.load', () => {
+    if (map.setProjection) map.setProjection({ type: 'globe' });
+
+    try {
+      map.addLayer({
+        id: 'sky',
+        type: 'sky',
+        paint: {
+          'sky-type': 'gradient',
+          'sky-gradient': [
+            'interpolate', ['linear'], ['sky-radial-progress'],
+            0.0, 'rgb(0,0,0)',
+            1.0, 'rgb(8,10,16)'
+          ],
+          'sky-gradient-center': [0, 0],
+          'sky-gradient-radius': 1,
+          'sky-opacity': 1
+        }
+      });
+    } catch (e) {
+      console.warn('Sky layer not supported', e);
+    }
+
+    map.getCanvas().style.background = 'transparent';
+    if (map.setFog) map.setFog({ 'horizon-blend': 1.0 });
+
+    (map.getStyle().layers || []).forEach(l => {
+      if (l.type === 'line') map.setLayoutProperty(l.id, 'visibility', 'none');
+      if (l.type === 'symbol') map.setLayoutProperty(l.id, 'visibility', 'none');
+      if (l.type === 'fill' && /land|background/i.test(l.id)) {
+        try { map.setPaintProperty(l.id, 'fill-color', '#0b0b0f'); } catch(e){}
+      }
+    });
+
+    // Spinning globe
+    const DEG_PER_SEC = 15;
+    let spinning = true;
+    let spinLng = map.getCenter().lng;
+    let spinLat = map.getCenter().lat;
+    let lastTS = 0;
+
+    function spin(ts) {
+      if (!lastTS) lastTS = ts;
+      const dt = (ts - lastTS) / 1000;
+      lastTS = ts;
+      if (spinning) {
+        spinLng -= DEG_PER_SEC * dt;
+        if (spinLng < -180) spinLng += 360;
+        map.jumpTo({ center: [spinLng, spinLat] });
+      }
+      requestAnimationFrame(spin);
+    }
+    requestAnimationFrame(spin);
+
+    function pauseSpin() { spinning = false; lastTS = 0; }
+    function resumeSpin() {
+      spinLat = map.getCenter().lat;
+      spinLng = map.getCenter().lng;
+      spinning = true;
+      lastTS = 0;
+    }
+
+    ['dragstart','mousedown','touchstart','wheel'].forEach(e => map.on(e, pauseSpin));
+    map.on('idle', resumeSpin);
+
+    // Add tile sources for each month
+    months.forEach((m, idx) => {
+      const monthNum = idx + 1;
+      map.addSource(`month-${monthNum}`, {
+        type: 'raster',
+        tiles: [getTileUrl(monthNum)],
+        tileSize: 256,
+        minzoom: 0,
+        maxzoom: 6
+      });
+      map.addLayer({
+        id: `month-${monthNum}`,
+        type: 'raster',
+        source: `month-${monthNum}`,
+        paint: {
+          'raster-opacity': idx === 0 ? 1 : 0,
+          'raster-fade-duration': 0
+        }
+      });
+    });
+
+    // Animate through months
+    const legendEl = document.getElementById('legend-month');
+    let currentMonth = 0;
+    const fps = 2;
+
+    setInterval(() => {
+      const nextMonth = (currentMonth + 1) % 12;
+      map.setPaintProperty(`month-${currentMonth + 1}`, 'raster-opacity', 0);
+      map.setPaintProperty(`month-${nextMonth + 1}`, 'raster-opacity', 1);
+      legendEl.textContent = `Month: ${months[nextMonth]}`;
+      currentMonth = nextMonth;
+    }, 1000 / fps);
+  });
+</script>
+
+</body>
+</html>
