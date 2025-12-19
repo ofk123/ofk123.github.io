@@ -32,7 +32,7 @@
   <strong>Layer Thickness</strong>
   <div id="legend-month">Month: January</div>
   <div>Units: dbar</div>
-  <div style="margin-top:6px; height:12px; width:200px; background: linear-gradient(to right, #2a186c, #14439c, #206e8b, #3d9e87, #89d0a4, #e6f598);"></div>
+  <div style="margin-top:6px; height:12px; width:200px; background: linear-gradient(to right, #00204d, #414287, #7b78a8, #b4b4c8, #fee838);"></div>
   <div style="display:flex; justify-content:space-between; font-size:11px;"><span>0</span><span>40</span></div>
 </div>
 
@@ -45,18 +45,8 @@
   // UPDATE THIS to your actual Render.com URL
   const TILE_SERVER = "https://deltapres-tiles.onrender.com";
 
-  const halineR = {
-    "0": "#f6f6f1", "16": "#d9e6dd", "32": "#b6d4c8", "48": "#8fc1b4",
-    "64": "#66aea1", "80": "#419b90", "96": "#1d8880", "112": "#007572",
-    "128": "#006164", "144": "#004d56", "160": "#003a48", "176": "#00283b",
-    "192": "#00172e", "208": "#000922", "224": "#000316", "240": "#00000a",
-    "255": "#000000"
-  };
-
-  const colormapParam = encodeURIComponent(JSON.stringify(halineR));
-
   function getTileUrl(month) {
-    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&style=raster/custom&colormap=${colormapParam}&colorscalerange=0,37&width=256&height=256`;
+    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&style=cividis/custom&colormap=${colormapParam}&colorscalerange=0,37&width=256&height=256`;
   }
 
   const map = new maplibregl.Map({
