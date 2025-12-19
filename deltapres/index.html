@@ -29,7 +29,7 @@
 <div id="map"></div>
 
 <div class="legend">
-  <strong>Layer Thickness</strong>
+  <strong>Delta-pressure between isopycnals 1027.61 & 1027.60</strong>
   <div id="legend-month">Month: January</div>
   <div>Units: dbar</div>
   <div style="margin-top:6px; height:12px; width:200px; background: linear-gradient(to right, #00204d, #414287, #7b78a8, #b4b4c8, #fee838);"></div>
@@ -46,7 +46,7 @@
   const TILE_SERVER = "https://deltapres-tiles.onrender.com";
 
   function getTileUrl(month) {
-    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&style=cividis/custom&colormap=${colormapParam}&colorscalerange=0,37&width=256&height=256`;
+    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&style=raster/cividis&colorscalerange=0,37&width=256&height=256`;
   }
 
   const map = new maplibregl.Map({
