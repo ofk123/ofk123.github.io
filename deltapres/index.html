@@ -29,9 +29,9 @@
 <div id="map"></div>
 
 <div class="legend">
-  <strong>Delta-pressure for 1027.60 and 1027.61</strong>
+  <strong>Delta-pressure [dbar]</strong>
+  <div>for 1027.60 - 1027.61</div>
   <div id="legend-month">Month: January</div>
-  <div>Units: dbar</div>
   <div style="margin-top:6px; height:12px; width:200px; background: linear-gradient(to right, #fee825, #b6de2b, #6cce5a, #1f9e89, #26838e, #31688e, #3e4a89, #482777, #440154);"></div>
   <div style="display:flex; justify-content:space-between; font-size:11px;"><span>0</span><span>37</span></div>
 </div>
@@ -44,14 +44,23 @@
 
   const TILE_SERVER = "https://deltapres-tiles.onrender.com";
 
+  const viridisR = {
+    "0": "#fde725", "16": "#d8e219", "32": "#b0dd2f", "48": "#89d548",
+    "64": "#65cb5e", "80": "#43bf71", "96": "#26b082", "112": "#1fa188",
+    "128": "#21918c", "144": "#287c8e", "160": "#2f6b8e", "176": "#355f8d",
+    "192": "#3b528b", "208": "#424186", "224": "#472d7b", "240": "#48186a",
+    "255": "#440154"
+  };
+  const colormapParam = encodeURIComponent(JSON.stringify(viridisR));
+
   function getTileUrl(month) {
-    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&style=raster/viridis_r&colorscalerange=0,37&width=256&height=256`;
+    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&colormap=${colormapParam}&colorscalerange=0,37&width=256&height=256`;
   }
 
   const map = new maplibregl.Map({
     container: 'map',
     style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-    center: [0, -50],
+    center: [0, -90],
     zoom: 1.0,
     maxZoom: 6,
     pitch: 2,
