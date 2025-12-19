@@ -54,7 +54,7 @@
   const colormapParam = encodeURIComponent(JSON.stringify(viridisR));
 
   function getTileUrl(month) {
-    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&colormap=${colormapParam}&colorscalerange=0,37&width=256&height=256`;
+    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&month=${month}&colormap=viridis_r&colorscalerange=0,37&width=256&height=256`;
   }
 
   const map = new maplibregl.Map({
