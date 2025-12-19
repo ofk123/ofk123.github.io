@@ -85,37 +85,6 @@
       }
     });
 
-    // Spinning globe
-    const DEG_PER_SEC = 3.75;
-    let spinning = true;
-    let spinLng = 0;
-    const spinLat = -90;  // Fixed at South Pole
-    let lastTS = 0;
-
-    function spin(ts) {
-      if (!lastTS) lastTS = ts;
-      const dt = (ts - lastTS) / 1000;
-      lastTS = ts;
-      if (spinning) {
-        spinLng -= DEG_PER_SEC * dt;
-        if (spinLng < -180) spinLng += 360;
-        map.jumpTo({ center: [spinLng, spinLat] });
-      }
-      requestAnimationFrame(spin);
-    }
-    requestAnimationFrame(spin);
-
-    function pauseSpin() { spinning = false; lastTS = 0; }
-    function resumeSpin() {
-      spinLng = map.getCenter().lng;
-      // Don't update spinLat - keep it at -90
-      spinning = true;
-      lastTS = 0;
-    }
-
-    ['dragstart','mousedown','touchstart','wheel'].forEach(e => map.on(e, pauseSpin));
-    map.on('idle', resumeSpin);
-
     // Add tile sources for each month
     months.forEach((m, idx) => {
       const monthNum = idx + 1;
