@@ -299,7 +299,7 @@
     "2023-11-16T00:00:00",
     "2023-12-16T12:00:00",
   ];
-  const TOTAL_MONTHS = 240; //or use TIME_VALUES.length;
+  const TOTAL_MONTHS = 240; //or TIME_VALUES.length;
   
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
@@ -422,19 +422,17 @@
       }
     });
 
-    // Stop animation and debounce tile updates while dragging slider
+    // Stop animation and tile updates, when dragging slider
     slider.addEventListener('input', (e) => {
       stopAnimation();
       isPlaying = false;
       playPauseBtn.textContent = 'Play';
 
       const monthIndex = parseInt(e.target.value);
-      
-      // Update legend immediately for responsiveness
       currentMonth = monthIndex;
       legendEl.textContent = `Date: ${getDateLabel(monthIndex)}`;
       
-      // Debounce tile fetching - only fetch after slider stops moving
+      // Only fetch after slider stops moving
       clearTimeout(sliderTimeout);
       sliderTimeout = setTimeout(() => {
         map.getSource('data').setTiles([getTileUrl(monthIndex)]);
