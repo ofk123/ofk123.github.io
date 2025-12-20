@@ -423,6 +423,9 @@
     // Stop animation and debounce tile updates while dragging slider
     slider.addEventListener('input', (e) => {
       stopAnimation();
+      isPlaying = false;
+      playPauseBtn.textContent = 'Play';
+
       const monthIndex = parseInt(e.target.value);
       
       // Update legend immediately for responsiveness
@@ -433,14 +436,11 @@
       clearTimeout(sliderTimeout);
       sliderTimeout = setTimeout(() => {
         map.getSource('data').setTiles([getTileUrl(monthIndex)]);
-      }, 150);  // Wait 150ms after last movement
+      }, 250);  // Wait 250ms after last movement
     });
 
     // Resume animation after releasing slider (if was playing)
     slider.addEventListener('change', (e) => {
-      if (isPlaying) {
-        startAnimation();
-      }
     });
 
     // Start animation
