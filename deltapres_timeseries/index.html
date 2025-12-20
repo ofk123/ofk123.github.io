@@ -388,6 +388,7 @@
     const legendEl = document.getElementById('legend-date');
     const slider = document.getElementById('slider');
     const playPauseBtn = document.getElementById('playPause');
+    let sliderTimeout;
 
     function updateMonth(monthIndex) {
       currentMonth = monthIndex;
@@ -419,10 +420,20 @@
       }
     });
 
-    // Stop animation while dragging slider
+    // Stop animation and debounce tile updates while dragging slider
     slider.addEventListener('input', (e) => {
-      stopAnimation();  // Stop immediately
-      updateMonth(parseInt(e.target.value));
+      stopAnimation();
+      const monthIndex = parseInt(e.target.value);
+      
+      // Update legend immediately for responsiveness
+      currentMonth = monthIndex;
+      legendEl.textContent = `Date: ${getDateLabel(monthIndex)}`;
+      
+      // Debounce tile fetching - only fetch after slider stops moving
+      clearTimeout(sliderTimeout);
+      sliderTimeout = setTimeout(() => {
+        map.getSource('data').setTiles([getTileUrl(monthIndex)]);
+      }, 150);  // Wait 150ms after last movement
     });
 
     // Resume animation after releasing slider (if was playing)
