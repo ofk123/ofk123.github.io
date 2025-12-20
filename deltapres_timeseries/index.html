@@ -337,7 +337,7 @@
 
   function getTileUrl(monthIndex) {
     const timeStr = TIME_VALUES[monthIndex];
-    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&time=${timeStr}&style=raster/custom&colormap=${colormapParam}&colorscalerange=0,40&width=256&height=256`;
+    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&time=${timeStr}&style=raster/custom&colormap=${colormapParam}&colorscalerange=0,39&width=256&height=256`;
   }
 
   const map = new maplibregl.Map({
