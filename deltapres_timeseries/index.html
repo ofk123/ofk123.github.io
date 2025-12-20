@@ -419,8 +419,17 @@
       }
     });
 
+    // Stop animation while dragging slider
     slider.addEventListener('input', (e) => {
+      stopAnimation();  // Stop immediately
       updateMonth(parseInt(e.target.value));
+    });
+
+    // Resume animation after releasing slider (if was playing)
+    slider.addEventListener('change', (e) => {
+      if (isPlaying) {
+        startAnimation();
+      }
     });
 
     // Start animation
