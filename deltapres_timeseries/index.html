@@ -10,10 +10,12 @@
     html, body, #map { height: 100%; margin: 0; }
     body { background: #000; }
     
-    .legend {
+    .panel {
       position: absolute;
-      bottom: 12px;
+      bottom: 30px;
       left: 12px;
+      right: 12px;
+      max-width: 320px;
       background: rgba(255,255,255,0.9);
       padding: 10px 14px;
       border-radius: 6px;
@@ -21,18 +23,23 @@
       box-shadow: 0 1px 4px rgba(0,0,0,0.2);
       z-index: 2;
     }
-    .legend strong { font-size: 14px; }
-    
+    .panel strong { font-size: 14px; }
+
     .controls {
-      position: absolute;
-      bottom: 12px;
-      right: 12px;
-      background: rgba(255,255,255,0.9);
-      padding: 10px 14px;
-      border-radius: 6px;
-      font: 13px/1.4 system-ui, sans-serif;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(0,0,0,0.1);
+    }
+    .controls button {
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+    .controls input[type="range"] {
+      flex: 1;
+      min-width: 0;
     }
   </style>
   <script data-goatcounter="https://deltapres.goatcounter.com/count"
@@ -42,17 +49,21 @@
 
 <div id="map"></div>
 
-<div class="legend">
-  <strong>Delta-pressure [dbar]</strong>
-  <div>1027.60 / 1027.61 [kg/m³]</div>
-  <div id="legend-date">Date: January 2004</div>
-  <div style="margin-top:6px; height:12px; width:200px; background: linear-gradient(to right,#fdef9a, #78cb68, #3b9287, #0f5a91, #2a186c);"></div>
-  <div style="display:flex; justify-content:space-between; font-size:11px;"><span>0</span><span>37</span></div>
-</div>
-
-<div class="controls">
-  <button id="playPause">Pause</button>
-  <input type="range" id="slider" min="0" max="239" value="0" style="width: 150px;">
+<div class="panel">
+  <div class="legend-content">
+    <strong>Delta-pressure [dbar]</strong>
+    <div>1027.60 / 1027.61 [kg/m³]</div>
+    <div id="legend-date">Date: January 2004</div>
+    <div style="margin-top:6px; height:12px; width:100%; background: linear-gradient(to right,#fdef9a, #78cb68, #3b9287, #0f5a91, #2a186c);"></div>
+    <div style="display:flex; justify-content:space-between; font-size:11px;"><span>0</span><span>37</span></div>
+  </div>
+  
+  <div class="controls">
+    <button id="back">◀</button>
+    <button id="playPause">Pause</button>
+    <button id="next">▶</button>
+    <input type="range" id="slider" min="0" max="239" value="0">
+  </div>
 </div>
 
 <script src="timevalues.js"></script>
@@ -198,6 +209,22 @@
     // Resume animation after releasing slider (if it was playing)
     slider.addEventListener('change', (e) => {
     });
+
+    function stepMonth(direction) {
+      stopAnimation();
+      isPlaying = false;
+      playPauseBtn.textContent = 'Play';
+      
+      let nextMonth = currentMonth + direction;
+      // Wrap around
+      if (nextMonth < 0) nextMonth = TOTAL_MONTHS - 1;
+      if (nextMonth >= TOTAL_MONTHS) nextMonth = 0;
+      
+      updateMonth(nextMonth);
+    }
+
+    document.getElementById('back').addEventListener('click', () => stepMonth(-1));
+    document.getElementById('next').addEventListener('click', () => stepMonth(1));
 
     // Start animation
     startAnimation();
