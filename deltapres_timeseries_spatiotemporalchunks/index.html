@@ -1,0 +1,233 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Delta pressure - Southern Ocean</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.css">
+  <script src="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.js"></script>
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    body { background: #000; }
+    
+    .panel {
+      position: absolute;
+      bottom: 30px;
+      left: 12px;
+      right: 12px;
+      max-width: 320px;
+      background: rgba(255,255,255,0.9);
+      padding: 10px 14px;
+      border-radius: 6px;
+      font: 13px/1.4 system-ui, sans-serif;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+      z-index: 2;
+    }
+    .panel strong { font-size: 14px; }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(0,0,0,0.1);
+    }
+    .controls button {
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+    .controls input[type="range"] {
+      flex: 1;
+      min-width: 0;
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="panel">
+  <div class="legend-content">
+    <strong>Delta-pressure [dbar]</strong>
+    <div>1027.60 / 1027.61 [kg/m³]</div>
+    <div id="legend-date">Date: January 2004</div>
+    <div style="margin-top:6px; height:12px; width:100%; background: linear-gradient(to right,#fdef9a, #78cb68, #3b9287, #0f5a91, #2a186c);"></div>
+    <div style="display:flex; justify-content:space-between; font-size:11px;"><span>0</span><span>37</span></div>
+  </div>
+  
+  <div class="controls">
+    <button id="back">◀</button>
+    <button id="playPause">Pause</button>
+    <button id="next">▶</button>
+    <input type="range" id="slider" min="0" max="239" value="0">
+  </div>
+</div>
+
+<script src="timevalues.js"></script>
+<script>
+  const START_YEAR = 2004;
+
+  const TOTAL_MONTHS = 240; //or TIME_VALUES.length;
+  
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  
+  function getDateLabel(monthIndex) {
+    const date = new Date(TIME_VALUES[monthIndex]);
+    return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+  }
+
+  const TILE_SERVER = "https://deltapres-tiles-test.onrender.com";
+
+  const halineR = {
+    "0": "#fdef9a",
+    "16": "#e1e57c",
+    "32": "#c1dd64",
+    "48": "#9bd55c",
+    "64": "#78cb68",
+    "80": "#5fbe75",
+    "96": "#4faf7e",
+    "112": "#44a184",
+    "128": "#3b9287",
+    "144": "#338488",
+    "160": "#287689",
+    "176": "#1b698c",
+    "192": "#0f5a91",
+    "208": "#0f4999",
+    "224": "#2132a2",
+    "240": "#2e1d91",
+    "255": "#2a186c",
+  };
+
+  const colormapParam = encodeURIComponent(JSON.stringify(halineR));
+
+  function getTileUrl(monthIndex) {
+    const timeStr = TIME_VALUES[monthIndex];
+    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&time=${timeStr}&style=raster/custom&colormap=${colormapParam}&colorscalerange=0,39&width=256&height=256`;
+  }
+
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+    center: [0, -90],
+    zoom: 1.5,
+    maxZoom: 6,
+    pitch: 0,
+    bearing: 0,
+    antialias: true,
+    fadeDuration: 0
+  });
+
+  map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+  let currentMonth = 0;
+  let isPlaying = true;
+  let animationInterval;
+
+  map.on('style.load', () => {
+    if (map.setProjection) map.setProjection({ type: 'globe' });
+    if (map.setFog) map.setFog({ 'horizon-blend': 1.0 });
+
+    // Hide basemap labels and lines
+    (map.getStyle().layers || []).forEach(l => {
+      if (l.type === 'line') map.setLayoutProperty(l.id, 'visibility', 'none');
+      if (l.type === 'symbol') map.setLayoutProperty(l.id, 'visibility', 'none');
+      if (l.type === 'fill' && /land|background/i.test(l.id)) {
+        try { map.setPaintProperty(l.id, 'fill-color', '#0b0b0f'); } catch(e){}
+      }
+    });
+
+    map.addSource('data', {
+      type: 'raster',
+      tiles: [getTileUrl(0)],
+      tileSize: 256,
+      minzoom: 0,
+      maxzoom: 6
+    });
+
+    map.addLayer({
+      id: 'data-layer',
+      type: 'raster',
+      source: 'data',
+      paint: { 'raster-fade-duration': 0 }
+    });
+
+    const legendEl = document.getElementById('legend-date');
+    const slider = document.getElementById('slider');
+    const playPauseBtn = document.getElementById('playPause');
+    let sliderTimeout;
+
+    function updateMonth(monthIndex) {
+      currentMonth = monthIndex;
+      map.getSource('data').setTiles([getTileUrl(monthIndex)]);
+      legendEl.textContent = `Date: ${getDateLabel(monthIndex)}`;
+      slider.value = monthIndex;
+    }
+
+    // Animation
+    function startAnimation() {
+      animationInterval = setInterval(() => {
+        const nextMonth = (currentMonth + 1) % TOTAL_MONTHS;
+        updateMonth(nextMonth);
+      }, 1000); // 1 fps
+    }
+
+    function stopAnimation() {
+      clearInterval(animationInterval);
+    }
+
+    playPauseBtn.addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      playPauseBtn.textContent = isPlaying ? 'Pause' : 'Play';
+      if (isPlaying) {
+        startAnimation();
+      } else {
+        stopAnimation();
+      }
+    });
+
+    slider.addEventListener('input', (e) => {
+      stopAnimation();
+      isPlaying = false;
+      playPauseBtn.textContent = 'Play';
+
+      const monthIndex = parseInt(e.target.value);
+      currentMonth = monthIndex;
+      legendEl.textContent = `Date: ${getDateLabel(monthIndex)}`;
+    
+      clearTimeout(sliderTimeout);
+      sliderTimeout = setTimeout(() => {
+        map.getSource('data').setTiles([getTileUrl(monthIndex)]);
+      }, 250);  // Wait 250ms after last movement
+    });
+
+    // Resume animation after releasing slider (if it was playing)
+    slider.addEventListener('change', (e) => {
+    });
+
+    function stepMonth(direction) {
+      stopAnimation();
+      isPlaying = false;
+      playPauseBtn.textContent = 'Play';
+      
+      let nextMonth = currentMonth + direction;
+      // Wrap around
+      if (nextMonth < 0) nextMonth = TOTAL_MONTHS - 1;
+      if (nextMonth >= TOTAL_MONTHS) nextMonth = 0;
+      
+      updateMonth(nextMonth);
+    }
+
+    document.getElementById('back').addEventListener('click', () => stepMonth(-1));
+    document.getElementById('next').addEventListener('click', () => stepMonth(1));
+
+    // Start animation
+    startAnimation();
+  });
+</script>
+
+</body>
+</html>
