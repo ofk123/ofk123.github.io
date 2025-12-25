@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Comparison</title>
+  <style>
+    body { margin: 0; display: flex; height: 100vh; }
+    iframe { flex: 1; border: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <iframe src="https://ofk123.github.io/deltapres_timeseries_spatiotemporalchunks/index.html"></iframe>
+  <iframe src="https://ofk123.github.io/deltapres_timeseries_icechunk/index.html"></iframe>
+  <script>
+    document.addEventListener('keydown', e => {
+      if (e.key === 'r') {
+        document.querySelectorAll('iframe').forEach(f => f.src = f.src);
+      }
+    });
+  </script>
+</body>
+</html>
