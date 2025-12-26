@@ -8,13 +8,58 @@
   </style>
 </head>
 <body>
-  <iframe src="https://ofk123.github.io/deltapres_timeseries/index.html"></iframe>
-  <iframe src="https://ofk123.github.io/deltapres_timeseries_icechunk/index.html"></iframe>
+  <iframe id="left" src="https://ofk123.github.io/deltapres_timeseries/index.html"></iframe>
+  <iframe id="right" src="https://ofk123.github.io/deltapres_timeseries_icechunk/index.html"></iframe>
   <script>
     document.addEventListener('keydown', e => {
       if (e.key === 'r') {
         document.querySelectorAll('iframe').forEach(f => f.src = f.src);
       }
+    });
+
+    // Wait for both iframes to load, then sync their maps
+    let mapsReady = 0;
+    const iframes = [document.getElementById('left'), document.getElementById('right')];
+    
+    function setupSync() {
+      const leftMap = iframes[0].contentWindow.map;
+      const rightMap = iframes[1].contentWindow.map;
+      
+      if (!leftMap || !rightMap) {
+        console.log('Maps not found, retrying...');
+        setTimeout(setupSync, 500);
+        return;
+      }
+
+      let syncing = false;
+
+      function syncTo(target, source) {
+        if (syncing) return;
+        syncing = true;
+        target.jumpTo({
+          center: source.getCenter(),
+          zoom: source.getZoom(),
+          bearing: source.getBearing(),
+          pitch: source.getPitch()
+        });
+        syncing = false;
+      }
+
+      leftMap.on('move', () => syncTo(rightMap, leftMap));
+      rightMap.on('move', () => syncTo(leftMap, rightMap));
+      
+      console.log('Maps synced!');
+    }
+
+    // Start trying to sync after iframes load
+    iframes.forEach(iframe => {
+      iframe.addEventListener('load', () => {
+        mapsReady++;
+        if (mapsReady === 2) {
+          // Give the maps a moment to initialize
+          setTimeout(setupSync, 1000);
+        }
+      });
     });
   </script>
 </body>
