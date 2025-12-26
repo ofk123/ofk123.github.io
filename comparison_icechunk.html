@@ -1,15 +1,32 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Comparison</title>
+  <title>Comparison hmmm</title>
   <style>
     body { margin: 0; display: flex; height: 100vh; }
-    iframe { flex: 1; border: 1px solid #ccc; }
+    iframe { flex: 1; border: none; }
+    .divider { width: 2px; background: #444; }
+    .label {
+      position: absolute;
+      top: 10px;
+      padding: 4px 10px;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      font: 12px system-ui, sans-serif;
+      border-radius: 4px;
+      z-index: 10;
+    }
+    .label.left { left: 10px; }
+    .label.right { right: 10px; }
   </style>
 </head>
 <body>
-  <iframe id="left" src="https://ofk123.github.io/deltapres_timeseries/index.html"></iframe>
-  <iframe id="right" src="https://ofk123.github.io/deltapres_timeseries_icechunk/index.html"></iframe>
+  <span class="label left">Zarr</span>
+  <span class="label right">Icechunk</span>
+  <iframe id="left" src="deltapres_timeseries/index.html"></iframe>
+  <div class="divider"></div>
+  <iframe id="right" src="deltapres_timeseries_icechunk/index.html"></iframe>
+  
   <script>
     document.addEventListener('keydown', e => {
       if (e.key === 'r') {
@@ -17,23 +34,38 @@
       }
     });
 
-    // Wait for both iframes to load, then sync their maps
+    const leftFrame = document.getElementById('left');
+    const rightFrame = document.getElementById('right');
     let mapsReady = 0;
-    const iframes = [document.getElementById('left'), document.getElementById('right')];
-    
+
     function setupSync() {
-      const leftMap = iframes[0].contentWindow.map;
-      const rightMap = iframes[1].contentWindow.map;
-      
+      const leftWin = leftFrame.contentWindow;
+      const rightWin = rightFrame.contentWindow;
+      const leftDoc = leftFrame.contentDocument;
+      const rightDoc = rightFrame.contentDocument;
+      const leftMap = leftWin.map;
+      const rightMap = rightWin.map;
+
       if (!leftMap || !rightMap) {
         console.log('Maps not found, retrying...');
         setTimeout(setupSync, 500);
         return;
       }
 
-      let syncing = false;
+      // --- 1. Hide panel in right iframe ---
+      const rightPanel = rightDoc.querySelector('.panel');
+      if (rightPanel) {
+        rightPanel.style.display = 'none';
+      }
 
-      function syncTo(target, source) {
+      // --- 1b. Hide navigation controls in right iframe via injected CSS ---
+      const style = rightDoc.createElement('style');
+      style.textContent = '.maplibregl-ctrl-top-right { display: none !important; }';
+      rightDoc.head.appendChild(style);
+
+      // --- 2. Sync map view (pan/zoom/rotate) ---
+      let syncing = false;
+      function syncView(target, source) {
         if (syncing) return;
         syncing = true;
         target.jumpTo({
@@ -45,19 +77,88 @@
         syncing = false;
       }
 
-      leftMap.on('move', () => syncTo(rightMap, leftMap));
-      rightMap.on('move', () => syncTo(leftMap, rightMap));
-      
-      console.log('Maps synced!');
+      leftMap.on('move', () => syncView(rightMap, leftMap));
+      rightMap.on('move', () => syncView(leftMap, rightMap));
+
+      // --- 3. Sync animation controls ---
+      const leftSlider = leftDoc.getElementById('slider');
+      const rightSlider = rightDoc.getElementById('slider');
+      const leftPlayPause = leftDoc.getElementById('playPause');
+      const rightPlayPause = rightDoc.getElementById('playPause');
+      const leftBack = leftDoc.getElementById('back');
+      const rightBack = rightDoc.getElementById('back');
+      const leftNext = leftDoc.getElementById('next');
+      const rightNext = rightDoc.getElementById('next');
+
+      // Sync slider
+      if (leftSlider && rightSlider) {
+        leftSlider.addEventListener('input', () => {
+          rightSlider.value = leftSlider.value;
+          rightSlider.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        
+        leftSlider.addEventListener('change', () => {
+          rightSlider.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+      }
+
+      // Sync play/pause
+      if (leftPlayPause && rightPlayPause) {
+        leftPlayPause.addEventListener('click', () => {
+          rightPlayPause.click();
+        });
+      }
+
+      // Sync back button
+      if (leftBack && rightBack) {
+        leftBack.addEventListener('click', () => {
+          rightBack.click();
+        });
+      }
+
+      // Sync next button
+      if (leftNext && rightNext) {
+        leftNext.addEventListener('click', () => {
+          rightNext.click();
+        });
+      }
+
+      // --- 4. Keep sliders in sync during animation ---
+      // The animation updates slider.value directly, so we poll for changes
+      let lastSliderValue = leftSlider.value;
+      setInterval(() => {
+        if (leftSlider.value !== lastSliderValue) {
+          lastSliderValue = leftSlider.value;
+          if (rightSlider.value !== leftSlider.value) {
+            rightSlider.value = leftSlider.value;
+            // Trigger the tile update on the right side
+            rightDoc.getElementById('legend-date').textContent = 
+              leftDoc.getElementById('legend-date').textContent;
+            // Update right map tiles to match
+            const rightSource = rightMap.getSource('data');
+            if (rightSource) {
+              const leftTiles = leftMap.getSource('data').tiles;
+              // The tile URL contains the time parameter, we need to extract and adapt it
+              // Since both use the same time values, we sync via the month index
+              rightWin.eval(`
+                const monthIndex = ${leftSlider.value};
+                const timeStr = TIME_VALUES[monthIndex];
+                map.getSource('data').setTiles([getTileUrl(monthIndex)]);
+              `);
+            }
+          }
+        }
+      }, 100);
+
+      console.log('Maps and controls synced!');
     }
 
     // Start trying to sync after iframes load
-    iframes.forEach(iframe => {
+    [leftFrame, rightFrame].forEach(iframe => {
       iframe.addEventListener('load', () => {
         mapsReady++;
         if (mapsReady === 2) {
-          // Give the maps a moment to initialize
-          setTimeout(setupSync, 1000);
+          setTimeout(setupSync, 1500); // Give maps time to initialize
         }
       });
     });
