@@ -14,9 +14,6 @@
       if (params.get('panel') === 'off') {
         css += '.panel{display:none!important}';
       }
-      if (params.get('nav') === 'off') {
-        css += '.maplibregl-ctrl-top-right{display:none!important}';
-      }
       if (css) {
         document.write('<style>' + css + '</style>');
       }

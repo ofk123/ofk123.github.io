@@ -23,9 +23,9 @@
 <body>
   <span class="label left">Zarr</span>
   <span class="label right">Icechunk</span>
-  <iframe id="left" src="deltapres_timeseries/index.html"></iframe>
+  <iframe id="left" src="deltapres_timeseries/index.html?panel=on&nav=off"></iframe>
   <div class="divider"></div>
-  <iframe id="right" src="deltapres_timeseries_icechunk/index.html?panel=off&nav=off"></iframe>
+  <iframe id="right" src="deltapres_timeseries_icechunk/index.html?panel=off&nav=on"></iframe>
   
   <script>
     document.addEventListener('keydown', e => {
@@ -57,11 +57,6 @@
       if (rightPanel) {
         rightPanel.style.display = 'none';
       }
-
-      // --- 1b. Hide navigation controls in right iframe via injected CSS ---
-      const style = rightDoc.createElement('style');
-      style.textContent = '.maplibregl-ctrl-top-right { display: none !important; }';
-      rightDoc.head.appendChild(style);
 
       // --- 2. Sync map view (pan/zoom/rotate) ---
       let syncing = false;
