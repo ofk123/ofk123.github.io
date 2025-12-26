@@ -13,7 +13,7 @@
     <title>Ola Formo Kihle</title>
     <style>
       body {
-        background-color: #f6f6fc;  /* Off-white page background */
+        background-color: #f6f6fc;
         font-family: 'Arial', sans-serif;
       }
       img {
@@ -22,19 +22,17 @@
       }
       .text {
         font-size: 10px;
-        /* Removed padding-left: 25px since Bootstrap grid provides spacing */
       }
-      /* Center certain elements on smaller screens */
 
       #profile-pic{
         display:block;
-        margin:0 auto;                 /* center on mobile */
+        margin:0 auto;
         width: clamp(120px, 28vw, 200px);
-        height:auto;                    /* preserve aspect ratio */
+        height:auto;
       }
 
       @media (min-width: 300px) {
-        #profile-pic { width: 45%; } /* adjust 85% to taste */
+        #profile-pic { width: 45%; }
       }
       @media (max-width: 767px) {
         #profile-pic, #tools-image {
@@ -46,10 +44,9 @@
         }
       }
       @media (min-width: 1200px) {
-        #map-section .container { width: 1300px !important; } /* tweak 1280 → the width you prefer */
+        #map-section .container { width: 1300px !important; }
       }
 
-      /* Unify the three blocks’ look */
       .site-title { 
         margin: 16px 0 10px;
         font-size: clamp(10px, 1.9vw, 10px);
@@ -60,12 +57,11 @@
       .main-text p,
       .main-text ul,
       .footer-note {
-        font-size: 12px;    /* overrides your .text=10px inside the main block */
+        font-size: 12px;
         line-height: 1.55;
         margin-bottom: 10px;
       }
 
-      /* Slightly larger body text on tablets/desktops */
       @media (min-width: 768px) {
         .main-text,
         .main-text p,
@@ -73,12 +69,35 @@
         .footer-note { font-size: 10px; }
       }
 
-      /* Center heading + blocks on phones, align with column on larger screens */
       @media (max-width: 767px) {
         .site-title, .main-text, .footer-note { text-align: center; }
       }
 
-      
+      /* Comparison container fixes */
+      #comparisonContainer {
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+
+      #comparisonContainer iframe {
+        min-width: 0;
+      }
+
+      @media (max-width: 600px) {
+        #comparisonContainer {
+          flex-direction: column;
+          height: auto !important;
+        }
+        #comparisonContainer iframe {
+          flex: none;
+          height: 300px;
+          border-right: none !important;
+          border-bottom: 1px solid #ccc;
+        }
+        #comparisonContainer iframe:last-child {
+          border-bottom: none;
+        }
+      }
     </style>
 </head>
 <body>
@@ -121,8 +140,6 @@
       </div>
     </div>
   </div>
-
-  
 
   <!-- Map Section (wrapped in a responsive grid) -->
   <section id="map-section" style="margin: 10px 0;">

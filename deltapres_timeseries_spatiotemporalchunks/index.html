@@ -6,6 +6,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.css">
   <script src="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.js"></script>
+  <script>
+    // Immediately hide elements based on URL params (prevents flash)
+    (function() {
+      var params = new URLSearchParams(location.search);
+      var css = '';
+      if (params.get('panel') === 'off') {
+        css += '.panel{display:none!important}';
+      }
+      if (params.get('nav') === 'off') {
+        css += '.maplibregl-ctrl-top-right{display:none!important}';
+      }
+      if (css) {
+        document.write('<style>' + css + '</style>');
+      }
+    })();
+  </script>
   <style>
     html, body, #map { height: 100%; margin: 0; }
     body { background: #000; }

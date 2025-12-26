@@ -6,44 +6,85 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.css">
   <script src="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.js"></script>
+  <script>
+  // Immediately hide elements based on URL params (prevents flash)
+    (function() {
+      var params = new URLSearchParams(location.search);
+      var css = '';
+      if (params.get('panel') === 'off') {
+        css += '.panel{display:none!important}';
+      }
+      if (params.get('nav') === 'off') {
+        css += '.maplibregl-ctrl-top-right{display:none!important}';
+      }
+      if (css) {
+        document.write('<style>' + css + '</style>');
+      }
+    })();
+  </script>
   <style>
-    html, body, #map { height: 100%; margin: 0; }
-    body { background: #000; }
+    * { box-sizing: border-box; }
     
-    .panel {
-      position: absolute;
-      bottom: 30px;
-      left: 12px;
-      right: 12px;
-      max-width: 320px;
-      background: rgba(255,255,255,0.9);
-      padding: 10px 14px;
-      border-radius: 6px;
-      font: 13px/1.4 system-ui, sans-serif;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-      z-index: 2;
+    html, body { 
+      margin: 0; 
+      padding: 0;
+      height: 100%;
+      height: 100dvh; /* Dynamic viewport height for mobile */
+      overflow: hidden;
     }
-    .panel strong { font-size: 14px; }
-
-    .controls {
+    
+    body {
       display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid rgba(0,0,0,0.1);
     }
-    .controls button {
+    
+    iframe { 
+      flex: 1; 
+      border: none;
+      min-width: 0; /* Prevent flex items from overflowing */
+    }
+    
+    .divider { 
+      width: 2px; 
+      background: #444;
+      flex-shrink: 0;
+    }
+    
+    .label {
+      position: absolute;
+      top: 10px;
       padding: 4px 10px;
-      cursor: pointer;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      font: 12px system-ui, sans-serif;
+      border-radius: 4px;
+      z-index: 10;
     }
-    .controls input[type="range"] {
-      flex: 1;
-      min-width: 0;
+    .label.left { left: 10px; }
+    .label.right { right: 10px; }
+    
+    /* Mobile: stack vertically */
+    @media (max-width: 600px) {
+      body {
+        flex-direction: column;
+      }
+      iframe {
+        flex: 1;
+        min-height: 0;
+      }
+      .divider {
+        width: 100%;
+        height: 2px;
+      }
+      .label.right {
+        top: auto;
+        bottom: calc(50% + 10px); /* Position above the bottom iframe */
+      }
     }
   </style>
 </head>
 <body>
+
+  
 
 <div id="map"></div>
 
@@ -66,6 +107,7 @@
 
 <script src="timevalues.js"></script>
 <script>
+
   const START_YEAR = 2004;
 
   const TOTAL_MONTHS = 240; //or TIME_VALUES.length;
