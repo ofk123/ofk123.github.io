@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.css">
   <script src="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.js"></script>
   <script>
-  // Immediately hide elements based on URL params (prevents flash)
+    // Immediately hide elements based on URL params (prevents flash)
     (function() {
       var params = new URLSearchParams(location.search);
       var css = '';
@@ -23,68 +23,43 @@
     })();
   </script>
   <style>
-    * { box-sizing: border-box; }
+    html, body, #map { height: 100%; margin: 0; }
+    body { background: #000; }
     
-    html, body { 
-      margin: 0; 
-      padding: 0;
-      height: 100%;
-      height: 100dvh; /* Dynamic viewport height for mobile */
-      overflow: hidden;
-    }
-    
-    body {
-      display: flex;
-    }
-    
-    iframe { 
-      flex: 1; 
-      border: none;
-      min-width: 0; /* Prevent flex items from overflowing */
-    }
-    
-    .divider { 
-      width: 2px; 
-      background: #444;
-      flex-shrink: 0;
-    }
-    
-    .label {
+    .panel {
       position: absolute;
-      top: 10px;
-      padding: 4px 10px;
-      background: rgba(0,0,0,0.7);
-      color: #fff;
-      font: 12px system-ui, sans-serif;
-      border-radius: 4px;
-      z-index: 10;
+      bottom: 30px;
+      left: 12px;
+      right: 12px;
+      max-width: 320px;
+      background: rgba(255,255,255,0.9);
+      padding: 10px 14px;
+      border-radius: 6px;
+      font: 13px/1.4 system-ui, sans-serif;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+      z-index: 2;
     }
-    .label.left { left: 10px; }
-    .label.right { right: 10px; }
-    
-    /* Mobile: stack vertically */
-    @media (max-width: 600px) {
-      body {
-        flex-direction: column;
-      }
-      iframe {
-        flex: 1;
-        min-height: 0;
-      }
-      .divider {
-        width: 100%;
-        height: 2px;
-      }
-      .label.right {
-        top: auto;
-        bottom: calc(50% + 10px); /* Position above the bottom iframe */
-      }
+    .panel strong { font-size: 14px; }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(0,0,0,0.1);
+    }
+    .controls button {
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+    .controls input[type="range"] {
+      flex: 1;
+      min-width: 0;
     }
   </style>
 </head>
 <body>
-
-  
 
 <div id="map"></div>
 
@@ -107,10 +82,9 @@
 
 <script src="timevalues.js"></script>
 <script>
-
   const START_YEAR = 2004;
 
-  const TOTAL_MONTHS = 240; //or TIME_VALUES.length;
+  const TOTAL_MONTHS = 240;
   
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
@@ -211,12 +185,11 @@
       slider.value = monthIndex;
     }
 
-    // Animation
     function startAnimation() {
       animationInterval = setInterval(() => {
         const nextMonth = (currentMonth + 1) % TOTAL_MONTHS;
         updateMonth(nextMonth);
-      }, 1000); // 1 fps
+      }, 1000);
     }
 
     function stopAnimation() {
@@ -245,10 +218,9 @@
       clearTimeout(sliderTimeout);
       sliderTimeout = setTimeout(() => {
         map.getSource('data').setTiles([getTileUrl(monthIndex)]);
-      }, 250);  // Wait 250ms after last movement
+      }, 250);
     });
 
-    // Resume animation after releasing slider (if it was playing)
     slider.addEventListener('change', (e) => {
     });
 
@@ -258,7 +230,6 @@
       playPauseBtn.textContent = 'Play';
       
       let nextMonth = currentMonth + direction;
-      // Wrap around
       if (nextMonth < 0) nextMonth = TOTAL_MONTHS - 1;
       if (nextMonth >= TOTAL_MONTHS) nextMonth = 0;
       
@@ -268,7 +239,6 @@
     document.getElementById('back').addEventListener('click', () => stepMonth(-1));
     document.getElementById('next').addEventListener('click', () => stepMonth(1));
 
-    // Start animation
     startAnimation();
   });
 </script>

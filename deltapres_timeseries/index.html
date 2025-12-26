@@ -58,8 +58,6 @@
       min-width: 0;
     }
   </style>
-  <script data-goatcounter="https://deltapres.goatcounter.com/count"
-        async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
 
@@ -86,7 +84,7 @@
 <script>
   const START_YEAR = 2004;
 
-  const TOTAL_MONTHS = 240; //or TIME_VALUES.length;
+  const TOTAL_MONTHS = 240;
   
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
@@ -187,12 +185,11 @@
       slider.value = monthIndex;
     }
 
-    // Animation
     function startAnimation() {
       animationInterval = setInterval(() => {
         const nextMonth = (currentMonth + 1) % TOTAL_MONTHS;
         updateMonth(nextMonth);
-      }, 1000); // 1 fps
+      }, 1000);
     }
 
     function stopAnimation() {
@@ -221,10 +218,9 @@
       clearTimeout(sliderTimeout);
       sliderTimeout = setTimeout(() => {
         map.getSource('data').setTiles([getTileUrl(monthIndex)]);
-      }, 250);  // Wait 250ms after last movement
+      }, 250);
     });
 
-    // Resume animation after releasing slider (if it was playing)
     slider.addEventListener('change', (e) => {
     });
 
@@ -234,7 +230,6 @@
       playPauseBtn.textContent = 'Play';
       
       let nextMonth = currentMonth + direction;
-      // Wrap around
       if (nextMonth < 0) nextMonth = TOTAL_MONTHS - 1;
       if (nextMonth >= TOTAL_MONTHS) nextMonth = 0;
       
@@ -244,7 +239,6 @@
     document.getElementById('back').addEventListener('click', () => stepMonth(-1));
     document.getElementById('next').addEventListener('click', () => stepMonth(1));
 
-    // Start animation
     startAnimation();
   });
 </script>
