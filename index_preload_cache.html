@@ -1,0 +1,506 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Delta pressure - Cache Preload Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.css">
+  <script src="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.js"></script>
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    body { background: #000; }
+    
+    .panel {
+      position: absolute;
+      bottom: 30px;
+      left: 12px;
+      right: 12px;
+      max-width: 400px;
+      background: rgba(255,255,255,0.95);
+      padding: 10px 14px;
+      border-radius: 6px;
+      font: 13px/1.4 system-ui, sans-serif;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+      z-index: 2;
+    }
+    .panel strong { font-size: 14px; }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(0,0,0,0.1);
+    }
+    .controls button {
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+    .controls input[type="range"] {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .status {
+      margin-top: 8px;
+      padding: 6px 8px;
+      background: #f0f0f0;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: monospace;
+    }
+    .status .ready { color: #2a7d2a; }
+    .status .loading { color: #b58900; }
+    .cache-bar {
+      height: 4px;
+      background: #ddd;
+      border-radius: 2px;
+      margin-top: 4px;
+      overflow: hidden;
+    }
+    .cache-bar-fill {
+      height: 100%;
+      background: #2a7d2a;
+      width: 0%;
+      transition: width 0.2s;
+    }
+    .options {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(0,0,0,0.1);
+      font-size: 11px;
+    }
+    .options label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="panel">
+  <div class="legend-content">
+    <strong>Delta-pressure [dbar] — Cache Preload Test</strong>
+    <div>1027.60 / 1027.61 [kg/m³]</div>
+    <div id="legend-date">Date: January 2004</div>
+    <div style="margin-top:6px; height:12px; width:100%; background: linear-gradient(to right,#fdef9a, #78cb68, #3b9287, #0f5a91, #2a186c);"></div>
+    <div style="display:flex; justify-content:space-between; font-size:11px;"><span>0</span><span>37</span></div>
+  </div>
+  
+  <div class="controls">
+    <button id="back">◀</button>
+    <button id="playPause">Play</button>
+    <button id="next">▶</button>
+    <input type="range" id="slider" min="0" max="239" value="0">
+  </div>
+
+  <div class="status">
+    <div>
+      <span id="preloadStatus">Idle</span> | 
+      Cached: <span id="cachedCount">0</span>/240 frames
+    </div>
+    <div class="cache-bar"><div class="cache-bar-fill" id="cacheBarFill"></div></div>
+  </div>
+
+  <div class="options">
+    <label>
+      <input type="number" id="bufferDepth" min="1" max="20" style="width:50px">
+      Frames to preload ahead
+    </label>
+    <label>
+      <input type="checkbox" id="waitForPreload" checked>
+      Wait for preload before advancing (smoother, but may pause)
+    </label>
+    <button id="preloadAll" style="margin-top:4px">Preload All 240 Frames</button>
+  </div>
+</div>
+
+<script src="timevalues.js"></script>
+<script>
+  const TOTAL_MONTHS = TIME_VALUES.length;
+  const DEFAULT_BUFFER_DEPTH = 3;
+  const DEFAULT_RENDER_TIMEOUT = 5000;
+
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  
+  function getDateLabel(monthIndex) {
+    const date = new Date(TIME_VALUES[monthIndex]);
+    return `${monthNames[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+  }
+
+  const TILE_SERVER = "https://deltapres-tiles-icechunk.onrender.com";
+
+  const halineR = {
+    "0": "#fdef9a", "16": "#e1e57c", "32": "#c1dd64", "48": "#9bd55c",
+    "64": "#78cb68", "80": "#5fbe75", "96": "#4faf7e", "112": "#44a184",
+    "128": "#3b9287", "144": "#338488", "160": "#287689", "176": "#1b698c",
+    "192": "#0f5a91", "208": "#0f4999", "224": "#2132a2", "240": "#2e1d91",
+    "255": "#2a186c",
+  };
+
+  const colormapParam = encodeURIComponent(JSON.stringify(halineR));
+
+  function getTileUrlTemplate(monthIndex) {
+    const timeStr = TIME_VALUES[monthIndex];
+    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&time=${timeStr}&style=raster/custom&colormap=${colormapParam}&colorscalerange=0,39&width=256&height=256`;
+  }
+
+  // Get actual tile URLs for current viewport
+  function getVisibleTileUrls(map, monthIndex) {
+    const bounds = map.getBounds();
+    const zoom = Math.floor(map.getZoom());
+    const clampedZoom = Math.min(Math.max(zoom, 0), 6);
+    const tileUrls = [];
+    const timeStr = TIME_VALUES[monthIndex];
+    
+    // Tile range
+    const minTile = lngLatToTile(bounds.getWest(), bounds.getNorth(), clampedZoom);
+    const maxTile = lngLatToTile(bounds.getEast(), bounds.getSouth(), clampedZoom);
+    
+    for (let x = minTile.x; x <= maxTile.x; x++) {
+      for (let y = minTile.y; y <= maxTile.y; y++) {
+        const url = `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/${clampedZoom}/${y}/${x}?variables=layer_thickness&time=${timeStr}&style=raster/custom&colormap=${colormapParam}&colorscalerange=0,39&width=256&height=256`;
+        tileUrls.push(url);
+      }
+    }
+    
+    return tileUrls;
+  }
+
+  function lngLatToTile(lng, lat, zoom) {
+    const n = Math.pow(2, zoom);
+    const x = Math.floor((lng + 180) / 360 * n);
+    const latRad = lat * Math.PI / 180;
+    const y = Math.floor((1 - Math.asinh(Math.tan(latRad)) / Math.PI) / 2 * n);
+    return { 
+      x: Math.max(0, Math.min(n - 1, x)), 
+      y: Math.max(0, Math.min(n - 1, y)) 
+    };
+  }
+
+  class TileCachePreloader {
+    constructor(map) {
+      this.map = map;
+      this.cachedMonths = new Set();
+      this.preloadingMonths = new Set();
+      this.onStatusChange = () => {};
+    }
+
+    async preloadMonth(monthIndex) {
+      if (this.cachedMonths.has(monthIndex) || this.preloadingMonths.has(monthIndex)) {
+        return;
+      }
+
+      this.preloadingMonths.add(monthIndex);
+      this.onStatusChange();
+
+      const tileUrls = getVisibleTileUrls(this.map, monthIndex);
+      console.log(`Preloading month ${monthIndex}: ${tileUrls.length} tiles`);
+
+      try {
+        // Fetch tiles
+        await Promise.all(tileUrls.map(url => 
+          fetch(url, { 
+            mode: 'cors',
+            // Let browser cache handle 
+            cache: 'default'
+          }).catch(e => {
+            console.warn(`Failed to preload tile: ${url}`, e);
+          })
+        ));
+
+        this.cachedMonths.add(monthIndex);
+        console.log(`Cached month ${monthIndex}`);
+      } catch (e) {
+        console.error(`Failed to preload month ${monthIndex}`, e);
+      } finally {
+        this.preloadingMonths.delete(monthIndex);
+        this.onStatusChange();
+      }
+    }
+
+    async preloadRange(startMonth, count) {
+      const promises = [];
+      for (let i = 0; i < count; i++) {
+        const month = (startMonth + i) % TOTAL_MONTHS;
+        promises.push(this.preloadMonth(month));
+      }
+      await Promise.all(promises);
+    }
+
+    async preloadAll(onProgress) {
+      for (let i = 0; i < TOTAL_MONTHS; i++) {
+        await this.preloadMonth(i);
+        if (onProgress) onProgress(i + 1, TOTAL_MONTHS);
+      }
+    }
+
+    isCached(monthIndex) {
+      return this.cachedMonths.has(monthIndex);
+    }
+
+    isPreloading(monthIndex) {
+      return this.preloadingMonths.has(monthIndex);
+    }
+
+    getCachedCount() {
+      return this.cachedMonths.size;
+    }
+  }
+
+  //Animation attempt:
+
+  class CachePreloadAnimator {
+    constructor(map, preloader, options = {}) {
+      this.map = map;
+      this.preloader = preloader;
+      this.currentMonth = 0;
+      this.isPlaying = false;
+      this.bufferDepth = options.bufferDepth || DEFAULT_BUFFER_DEPTH;
+      this.waitForPreload = options.waitForPreload !== false;
+      this.frameInterval = options.frameInterval || 1000;
+      this.renderTimeout = options.renderTimeout || DEFAULT_RENDER_TIMEOUT;
+      
+      this.onFrameChange = options.onFrameChange || (() => {});
+    }
+
+    // Wait for the data source to be fully loaded/rendered
+    waitForRender() {
+      return new Promise((resolve) => {
+        if (this.map.isSourceLoaded('data')) {
+          resolve();
+          return;
+        }
+
+        const timeout = setTimeout(() => {
+          console.warn('Render timeout - proceeding anyway');
+          this.map.off('idle', onIdle);
+          resolve();
+        }, this.renderTimeout);
+
+        // Listen for idle event
+        const onIdle = () => {
+          if (this.map.isSourceLoaded('data')) {
+            clearTimeout(timeout);
+            this.map.off('idle', onIdle);
+            resolve();
+          }
+        };
+
+        this.map.on('idle', onIdle);
+      });
+    }
+
+    async advanceFrame() {
+      const nextMonth = (this.currentMonth + 1) % TOTAL_MONTHS;
+      
+      // Start preloading upcoming number of frames
+      this.preloader.preloadRange(nextMonth + 1, this.bufferDepth);
+
+      // Wait for next frame to be cached
+      if (this.waitForPreload && !this.preloader.isCached(nextMonth)) {
+        console.log(`Waiting for month ${nextMonth} to preload...`);
+        await this.preloader.preloadMonth(nextMonth);
+      }
+
+      // Update
+      this.currentMonth = nextMonth;
+      this.map.getSource('data').setTiles([getTileUrlTemplate(nextMonth)]);
+      this.onFrameChange(nextMonth);
+
+      await this.waitForRender();
+    }
+
+    async play() {
+      if (this.isPlaying) return;
+      this.isPlaying = true;
+
+      // Preload
+      await this.preloader.preloadRange(this.currentMonth, this.bufferDepth);
+
+      const loop = async () => {
+        if (!this.isPlaying) return;
+
+        const startTime = Date.now();
+        await this.advanceFrame();
+        const elapsed = Date.now() - startTime;
+
+        // Then do next frame
+        const delay = Math.max(0, this.frameInterval - elapsed);
+        setTimeout(loop, delay);
+      };
+
+      loop();
+    }
+
+    pause() {
+      this.isPlaying = false;
+    }
+
+    goToMonth(monthIndex) {
+      this.currentMonth = monthIndex;
+      this.map.getSource('data').setTiles([getTileUrlTemplate(monthIndex)]);
+      this.onFrameChange(monthIndex);
+      
+      // Preload around current position
+      this.preloader.preloadRange(monthIndex, this.bufferDepth);
+    }
+
+    stepForward() {
+      this.pause();
+      const next = (this.currentMonth + 1) % TOTAL_MONTHS;
+      this.goToMonth(next);
+    }
+
+    stepBackward() {
+      this.pause();
+      const prev = (this.currentMonth - 1 + TOTAL_MONTHS) % TOTAL_MONTHS;
+      this.goToMonth(prev);
+    }
+  }
+
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+    center: [0, -60],
+    zoom: 2.5,
+    maxZoom: 6,
+    pitch: 0,
+    bearing: 0,
+    antialias: true,
+    fadeDuration: 0
+  });
+
+  map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+  let preloader;
+  let animator;
+
+  map.on('style.load', () => {
+    if (map.setProjection) map.setProjection({ type: 'globe' });
+    if (map.setFog) map.setFog({ 'horizon-blend': 1.0 });
+
+    // Hiding labels and lines
+    (map.getStyle().layers || []).forEach(l => {
+      if (l.type === 'line') map.setLayoutProperty(l.id, 'visibility', 'none');
+      if (l.type === 'symbol') map.setLayoutProperty(l.id, 'visibility', 'none');
+      if (l.type === 'fill' && /land|background/i.test(l.id)) {
+        try { map.setPaintProperty(l.id, 'fill-color', '#0b0b0f'); } catch(e){}
+      }
+    });
+    
+    map.addSource('data', {
+      type: 'raster',
+      tiles: [getTileUrlTemplate(0)],
+      tileSize: 256,
+      minzoom: 0,
+      maxzoom: 6
+    });
+
+    map.addLayer({
+      id: 'data-layer',
+      type: 'raster',
+      source: 'data',
+      paint: { 'raster-fade-duration': 0 }
+    });
+
+    // UI elements
+    const legendEl = document.getElementById('legend-date');
+    const slider = document.getElementById('slider');
+    const playPauseBtn = document.getElementById('playPause');
+    const preloadStatus = document.getElementById('preloadStatus');
+    const cachedCount = document.getElementById('cachedCount');
+    const cacheBarFill = document.getElementById('cacheBarFill');
+    const bufferDepthInput = document.getElementById('bufferDepth');
+    const waitForPreloadCheckbox = document.getElementById('waitForPreload');
+    const preloadAllBtn = document.getElementById('preloadAll');
+
+    // set buffer "depth"
+    bufferDepthInput.value = DEFAULT_BUFFER_DEPTH;
+
+    // Create preloader and animator
+    preloader = new TileCachePreloader(map);
+    preloader.onStatusChange = () => {
+      const count = preloader.getCachedCount();
+      cachedCount.textContent = count;
+      cacheBarFill.style.width = `${(count / TOTAL_MONTHS) * 100}%`;
+      
+      if (preloader.preloadingMonths.size > 0) {
+        preloadStatus.textContent = `Preloading: ${[...preloader.preloadingMonths].join(', ')}`;
+        preloadStatus.className = 'loading';
+      } else {
+        preloadStatus.textContent = 'Idle';
+        preloadStatus.className = '';
+      }
+    };
+
+    animator = new CachePreloadAnimator(map, preloader, {
+      frameInterval: 1000,
+      bufferDepth: DEFAULT_BUFFER_DEPTH,
+      renderTimeout: DEFAULT_RENDER_TIMEOUT,
+      waitForPreload: true,
+      onFrameChange: (monthIndex) => {
+        legendEl.textContent = `Date: ${getDateLabel(monthIndex)}`;
+        slider.value = monthIndex;
+      }
+    });
+
+    playPauseBtn.addEventListener('click', () => {
+      if (animator.isPlaying) {
+        animator.pause();
+        playPauseBtn.textContent = 'Play';
+      } else {
+        animator.bufferDepth = parseInt(bufferDepthInput.value) || DEFAULT_BUFFER_DEPTH;
+        animator.waitForPreload = waitForPreloadCheckbox.checked;
+        animator.play();
+        playPauseBtn.textContent = 'Pause';
+      }
+    });
+
+    let sliderTimeout;
+    slider.addEventListener('input', (e) => {
+      animator.pause();
+      playPauseBtn.textContent = 'Play';
+      
+      const monthIndex = parseInt(e.target.value);
+      legendEl.textContent = `Date: ${getDateLabel(monthIndex)}`;
+      
+      clearTimeout(sliderTimeout);
+      sliderTimeout = setTimeout(() => {
+        animator.goToMonth(monthIndex);
+      }, 150);
+    });
+
+    document.getElementById('back').addEventListener('click', () => {
+      playPauseBtn.textContent = 'Play';
+      animator.stepBackward();
+    });
+    
+    document.getElementById('next').addEventListener('click', () => {
+      playPauseBtn.textContent = 'Play';
+      animator.stepForward();
+    });
+
+    preloadAllBtn.addEventListener('click', async () => {
+      preloadAllBtn.disabled = true;
+      preloadAllBtn.textContent = 'Preloading...';
+      
+      await preloader.preloadAll((current, total) => {
+        preloadAllBtn.textContent = `Preloading ${current}/${total}...`;
+      });
+      
+      preloadAllBtn.textContent = 'All frames cached!';
+    });
+  });
+</script>
+
+</body>
+</html>

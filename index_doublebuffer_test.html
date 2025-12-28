@@ -1,0 +1,420 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Delta pressure - Double Buffer Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.css">
+  <script src="https://unpkg.com/maplibre-gl@5.11.0/dist/maplibre-gl.js"></script>
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    body { background: #000; }
+    
+    .panel {
+      position: absolute;
+      bottom: 30px;
+      left: 12px;
+      right: 12px;
+      max-width: 360px;
+      background: rgba(255,255,255,0.95);
+      padding: 10px 14px;
+      border-radius: 6px;
+      font: 13px/1.4 system-ui, sans-serif;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+      z-index: 2;
+    }
+    .panel strong { font-size: 14px; }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(0,0,0,0.1);
+    }
+    .controls button {
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+    .controls input[type="range"] {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .status {
+      margin-top: 8px;
+      padding: 6px 8px;
+      background: #f0f0f0;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: monospace;
+    }
+    .status .ready { color: #2a7d2a; }
+    .status .loading { color: #b58900; }
+    .status .label { color: #666; }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="panel">
+  <div class="legend-content">
+    <strong>Delta-pressure [dbar] — Double Buffer Test</strong>
+    <div>1027.60 / 1027.61 [kg/m³]</div>
+    <div id="legend-date">Date: January 2004</div>
+    <div style="margin-top:6px; height:12px; width:100%; background: linear-gradient(to right,#fdef9a, #78cb68, #3b9287, #0f5a91, #2a186c);"></div>
+    <div style="display:flex; justify-content:space-between; font-size:11px;"><span>0</span><span>37</span></div>
+  </div>
+  
+  <div class="controls">
+    <button id="back">◀</button>
+    <button id="playPause">Pause</button>
+    <button id="next">▶</button>
+    <input type="range" id="slider" min="0" max="239" value="0">
+  </div>
+
+  <div class="status">
+    <span class="label">Buffer A:</span> <span id="statusA">-</span> | 
+    <span class="label">Buffer B:</span> <span id="statusB">-</span>
+    <p></p>
+    <span class="label">Active:</span> <span id="activeBuffer">-</span>
+  </div>
+</div>
+
+<script src="timevalues.js"></script>
+<script>
+  const TOTAL_MONTHS = TIME_VALUES.length;
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  
+  function getDateLabel(monthIndex) {
+    const date = new Date(TIME_VALUES[monthIndex]);
+    return `${monthNames[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+  }
+
+  const TILE_SERVER = "https://deltapres-tiles-test.onrender.com";
+
+  const halineR = {
+    "0": "#fdef9a", "16": "#e1e57c", "32": "#c1dd64", "48": "#9bd55c",
+    "64": "#78cb68", "80": "#5fbe75", "96": "#4faf7e", "112": "#44a184",
+    "128": "#3b9287", "144": "#338488", "160": "#287689", "176": "#1b698c",
+    "192": "#0f5a91", "208": "#0f4999", "224": "#2132a2", "240": "#2e1d91",
+    "255": "#2a186c",
+  };
+
+  const colormapParam = encodeURIComponent(JSON.stringify(halineR));
+
+  function getTileUrl(monthIndex) {
+    const timeStr = TIME_VALUES[monthIndex];
+    return `${TILE_SERVER}/datasets/mydata/tiles/WebMercatorQuad/{z}/{y}/{x}?variables=layer_thickness&time=${timeStr}&style=raster/custom&colormap=${colormapParam}&colorscalerange=0,39&width=256&height=256`;
+  }
+  
+  class DoubleBufferAnimator {
+    constructor(map, options = {}) {
+      this.map = map;
+      this.buffers = ['A', 'B'];
+      this.activeBuffer = 'A';
+      this.currentMonth = 0;
+      this.nextMonth = 1;
+      this.isPlaying = false;
+      this.isPreloading = false;
+      this.preloadTimeout = options.preloadTimeout || 5000; /// Max wait
+      this.frameInterval = options.frameInterval || 1000; // fps
+      
+      this.onFrameChange = options.onFrameChange || (() => {});
+      this.onStatusChange = options.onStatusChange || (() => {});
+    }
+
+    init() {
+      // Create two sources and layers
+      for (const buf of this.buffers) {
+        const sourceId = `data-${buf}`;
+        const layerId = `layer-${buf}`;
+        
+        this.map.addSource(sourceId, {
+          type: 'raster',
+          tiles: [getTileUrl(buf === 'A' ? 0 : 1)],
+          tileSize: 256,
+          minzoom: 0,
+          maxzoom: 6
+        });
+
+        this.map.addLayer({
+          id: layerId,
+          type: 'raster',
+          source: sourceId,
+          paint: { 'raster-fade-duration': 0 },
+          layout: { visibility: buf === 'A' ? 'visible' : 'none' }
+        });
+      }
+
+      this.updateStatus();
+    }
+
+    getInactiveBuffer() {
+      return this.activeBuffer === 'A' ? 'B' : 'A';
+    }
+
+    updateStatus() {
+      this.onStatusChange({
+        activeBuffer: this.activeBuffer,
+        currentMonth: this.currentMonth,
+        isPreloading: this.isPreloading
+      });
+    }
+
+    // Wait for a source to finish loading all visible tiles
+    waitForSourceIdle(sourceId) {
+      return new Promise((resolve) => {
+        const checkIdle = () => {
+
+          if (this.map.isSourceLoaded(sourceId)) {
+            resolve();
+          } else {
+            setTimeout(checkIdle, 50);
+          }
+        };
+        
+        /// timeout to prevent infinite waiting
+        const timeout = setTimeout(() => {
+          console.warn(`Timeout waiting for ${sourceId}`);
+          resolve();
+        }, this.preloadTimeout);
+
+        setTimeout(() => {
+          const originalResolve = resolve;
+          const wrappedResolve = () => {
+            clearTimeout(timeout);
+            originalResolve();
+          };
+          
+          if (this.map.isSourceLoaded(sourceId)) {
+            wrappedResolve();
+          } else {
+            // idle event ?
+            const onIdle = () => {
+              if (this.map.isSourceLoaded(sourceId)) {
+                this.map.off('idle', onIdle);
+                wrappedResolve();
+              }
+            };
+            this.map.on('idle', onIdle);
+          }
+        }, 100);
+      });
+    }
+
+    async preloadNext() {
+      if (this.isPreloading) return;
+      
+      this.isPreloading = true;
+      const inactiveBuffer = this.getInactiveBuffer();
+      const sourceId = `data-${inactiveBuffer}`;
+      
+      // Next month index
+      this.nextMonth = (this.currentMonth + 1) % TOTAL_MONTHS;
+      
+      console.log(`Preloading month ${this.nextMonth} into buffer ${inactiveBuffer}`);
+      
+      // Update tiles
+      this.map.getSource(sourceId).setTiles([getTileUrl(this.nextMonth)]);
+      
+      this.updateStatus();
+      
+      // Wait for tiles to load
+      await this.waitForSourceIdle(sourceId);
+      
+      this.isPreloading = false;
+      console.log(`Preload complete for month ${this.nextMonth}`);
+      this.updateStatus();
+    }
+
+    swapBuffers() {
+      const oldActive = this.activeBuffer;
+      const newActive = this.getInactiveBuffer();
+      
+      // Atomic visibility swap
+      this.map.setLayoutProperty(`layer-${newActive}`, 'visibility', 'visible');
+      this.map.setLayoutProperty(`layer-${oldActive}`, 'visibility', 'none');
+      
+      this.activeBuffer = newActive;
+      this.currentMonth = this.nextMonth;
+      
+      this.onFrameChange(this.currentMonth);
+      this.updateStatus();
+      
+      console.log(`Swapped to buffer ${newActive}, showing month ${this.currentMonth}`);
+    }
+
+    async advanceFrame() {
+      if (!this.isPreloading) {
+        await this.preloadNext();
+      } else {
+        // Wait for current preload to finish
+        while (this.isPreloading) {
+          await new Promise(r => setTimeout(r, 50));
+        }
+      }
+      
+      /// Swap !!!
+      this.swapBuffers();
+
+      this.preloadNext();
+    }
+
+    async play() {
+      if (this.isPlaying) return;
+      this.isPlaying = true;
+      
+      const loop = async () => {
+        if (!this.isPlaying) return;
+        
+        const startTime = Date.now();
+        await this.advanceFrame();
+        const elapsed = Date.now() - startTime;
+
+        const delay = Math.max(0, this.frameInterval - elapsed);
+        setTimeout(loop, delay);
+      };
+      
+      loop();
+    }
+
+    pause() {
+      this.isPlaying = false;
+    }
+
+    async goToMonth(monthIndex) {
+      this.pause();
+      const sourceId = `data-${this.activeBuffer}`;
+      this.map.getSource(sourceId).setTiles([getTileUrl(monthIndex)]);
+      this.currentMonth = monthIndex;
+      this.onFrameChange(this.currentMonth);
+      this.preloadNext();
+    }
+
+    stepForward() {
+      this.advanceFrame();
+    }
+
+    stepBackward() {
+      this.pause();
+      const prevMonth = (this.currentMonth - 1 + TOTAL_MONTHS) % TOTAL_MONTHS;
+      this.goToMonth(prevMonth);
+    }
+  }
+
+  // mapping setup
+
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+    center: [0, -60],
+    zoom: 2.5,
+    maxZoom: 6,
+    pitch: 0,
+    bearing: 0,
+    antialias: true,
+    fadeDuration: 0
+  });
+
+  map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+  let animator;
+
+  map.on('style.load', () => {
+    if (map.setProjection) map.setProjection({ type: 'globe' });
+    if (map.setFog) map.setFog({ 'horizon-blend': 1.0 });
+
+    // Hide basemap labels and lines
+    (map.getStyle().layers || []).forEach(l => {
+      if (l.type === 'line') map.setLayoutProperty(l.id, 'visibility', 'none');
+      if (l.type === 'symbol') map.setLayoutProperty(l.id, 'visibility', 'none');
+      if (l.type === 'fill' && /land|background/i.test(l.id)) {
+        try { map.setPaintProperty(l.id, 'fill-color', '#0b0b0f'); } catch(e){}
+      }
+    });
+
+    // UI elements
+    const legendEl = document.getElementById('legend-date');
+    const slider = document.getElementById('slider');
+    const playPauseBtn = document.getElementById('playPause');
+    const statusA = document.getElementById('statusA');
+    const statusB = document.getElementById('statusB');
+    const activeBufferEl = document.getElementById('activeBuffer');
+
+    // Create animator
+    animator = new DoubleBufferAnimator(map, {
+      frameInterval: 1000,
+      preloadTimeout: 5000,
+      onFrameChange: (monthIndex) => {
+        legendEl.textContent = `Date: ${getDateLabel(monthIndex)}`;
+        slider.value = monthIndex;
+      },
+      onStatusChange: (status) => {
+        const inactiveBuffer = status.activeBuffer === 'A' ? 'B' : 'A';
+        
+        statusA.className = status.activeBuffer === 'A' ? 'ready' : 
+                           (status.isPreloading ? 'loading' : 'ready');
+        statusA.textContent = status.activeBuffer === 'A' ? 
+                             `Month ${status.currentMonth} (visible)` : 
+                             (status.isPreloading ? 'preloading...' : 'ready');
+        
+        statusB.className = status.activeBuffer === 'B' ? 'ready' : 
+                           (status.isPreloading ? 'loading' : 'ready');
+        statusB.textContent = status.activeBuffer === 'B' ? 
+                             `Month ${status.currentMonth} (visible)` : 
+                             (status.isPreloading ? 'preloading...' : 'ready');
+        
+        activeBufferEl.textContent = status.activeBuffer;
+      }
+    });
+
+    animator.init();
+
+    // Controls
+    playPauseBtn.addEventListener('click', () => {
+      if (animator.isPlaying) {
+        animator.pause();
+        playPauseBtn.textContent = 'Play';
+      } else {
+        animator.play();
+        playPauseBtn.textContent = 'Pause';
+      }
+    });
+
+    let sliderTimeout;
+    slider.addEventListener('input', (e) => {
+      animator.pause();
+      playPauseBtn.textContent = 'Play';
+      
+      const monthIndex = parseInt(e.target.value);
+      legendEl.textContent = `Date: ${getDateLabel(monthIndex)}`;
+      
+      clearTimeout(sliderTimeout);
+      sliderTimeout = setTimeout(() => {
+        animator.goToMonth(monthIndex);
+      }, 150);
+    });
+
+    document.getElementById('back').addEventListener('click', () => {
+      playPauseBtn.textContent = 'Play';
+      animator.stepBackward();
+    });
+    
+    document.getElementById('next').addEventListener('click', () => {
+      playPauseBtn.textContent = 'Play';
+      animator.stepForward();
+    });
+
+    // play 
+    animator.play();
+  });
+</script>
+
+</body>
+</html>
