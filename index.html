@@ -62,31 +62,6 @@
         margin-bottom: 10px;
       }
 
-      /* Iframe labels */
-      .iframe-wrapper {
-        position: relative;
-        flex: 1;
-        min-width: 0;
-      }
-
-      .iframe-wrapper iframe {
-        width: 100%;
-        height: 100%;
-      }
-
-      .iframe-label {
-        position: absolute;
-        top: 8px;
-        left: 8px;
-        padding: 3px 8px;
-        background: rgba(0,0,0,0.7);
-        color: #fff;
-        font: 9px system-ui, sans-serif;
-        border-radius: 3px;
-        z-index: 10;
-        pointer-events: none;
-      }
-
       @media (min-width: 768px) {
         .main-text,
         .main-text p,
@@ -98,40 +73,6 @@
         .site-title, .main-text, .footer-note { text-align: center; }
       }
 
-      /* Comparison container fixes */
-      #comparisonContainer {
-        max-width: 100%;
-        box-sizing: border-box;
-      }
-
-      #comparisonContainer iframe {
-        min-width: 0;
-      }
-
-      @media (max-width: 600px) {
-        #comparisonContainer {
-          flex-direction: column;
-          height: auto !important;
-        }
-        #comparisonContainer .iframe-wrapper {
-          flex: none;
-          height: 300px;
-          border-right: none !important;
-          border-bottom: 1px solid #ccc;
-        }
-        #comparisonContainer .iframe-wrapper:last-child {
-          border-bottom: none;
-        }
-        /* Swap order: right iframe on top, left iframe (with panel) on bottom */
-        #comparisonContainer .iframe-wrapper:first-child {
-          order: 2;
-          border-bottom: none;
-        }
-        #comparisonContainer .iframe-wrapper:last-child {
-          order: 1;
-          border-bottom: 1px solid #ccc;
-        }
-      }
     </style>
 </head>
 <body>
@@ -202,159 +143,30 @@
     </div>
   </section>
 
-  <section id="comparison-section" style="margin: 10px 0;">
+  <section id="velocity-section" style="margin: 10px 0;">
     <div class="container">
       <div class="row">
         <div class="col-xs-12 text-center">
-          <p class="text" style="margin-bottom: 5px;"><strong>Render timeseries using Xpublish's Tile router (<a href="https://github.com/earth-mover/xpublish-tiles" target="_blank">xpublish-tiles</a>):</strong></p>
-          <p class="text" style="margin-bottom: 5px;"><strong>Comparing Zarr datasets with/without Icechunk as a transactional storage engine </strong></p>
+          <p class="text" style="margin-bottom: 5px;"><strong>Absolute geostrophic velocity from Argo, 2004–2021, 0–2000 dbar: one Zarr dataset, two renderers</strong></p>
           <ul class="text" style="margin-bottom: 4px; text-align: left; display: inline-block; list-style-type: square;">
-            <li>Test it yourself: Pan around or change timestep, and see which version completes the render first.</li>
+            <li>Left: map tiles rendered on a server with <a href="https://github.com/earth-mover/xpublish-tiles" target="_blank">xpublish-tiles</a>. Right: the same Zarr chunks drawn in your browser with WebGL (<a href="https://github.com/carbonplan/zarr-layer" target="_blank">zarr-layer</a>).</li>
+            <li>Click the ocean for its time series and vertical profile, with the Gaussian process uncertainty.</li>
           </ul>
-          <p class="text" style="margin-bottom: 6px; color: #555; font-style: italic;">Both datasets are equally chunked (1 chunk per timestep) and stored on GCS. The Icechunk version caches data server-side, so repeated playbacks load faster.</p>
-          <div id="comparisonContainer" style="display: flex; height: 400px; border: 1px solid #ccc;">
-            <div class="iframe-wrapper" style="border-right: 1px solid #ccc;">
-              <span class="iframe-label">Zarr</span>
-              <iframe 
-                id="left-map"
-                src="deltapres_timeseries/index.html?panel=on&nav=off" 
-                style="border: none;"
-                loading="lazy">
-              </iframe>
-            </div>
-            <div class="iframe-wrapper">
-              <span class="iframe-label">Icechunk</span>
-              <iframe 
-                id="right-map"
-                src="deltapres_timeseries_icechunk/index.html?panel=off&nav=on" 
-                style="border: none;"
-                loading="lazy">
-              </iframe>
-            </div>
+          <div style="height: 420px; border: 1px solid #ccc;">
+            <iframe src="velocity/index.html" title="Argo velocity: server vs browser rendering"
+              style="width: 100%; height: 100%; border: none;" loading="lazy" allowfullscreen></iframe>
           </div>
         </div>
       </div>
       <div class="row">
         <div class="col-xs-12 text-center" style="margin:4px 0;">
-          <a href="comparison_icechunk.html" class="btn btn-primary btn-xs">
-            Comparison <span class="glyphicon glyphicon-resize-horizontal" aria-hidden="true"></span>
+          <a href="velocity/" class="btn btn-primary btn-xs">
+            Open <span class="glyphicon glyphicon-fullscreen" aria-hidden="true"></span>
           </a>
         </div>
       </div>
     </div>
   </section>
-
-  <script>
-    // Sync the two comparison maps
-    const leftFrame = document.getElementById('left-map');
-    const rightFrame = document.getElementById('right-map');
-    let mapsReady = 0;
-
-    function setupSync() {
-      const leftWin = leftFrame.contentWindow;
-      const rightWin = rightFrame.contentWindow;
-      const leftDoc = leftFrame.contentDocument;
-      const rightDoc = rightFrame.contentDocument;
-      const leftMap = leftWin.map;
-      const rightMap = rightWin.map;
-      
-      if (!leftMap || !rightMap) {
-        console.log('Maps not found, retrying...');
-        setTimeout(setupSync, 500);
-        return;
-      }
-
-      // --- 1. Hide panel in right iframe
-      const rightPanel = rightDoc.querySelector('.panel');
-      if (rightPanel) {
-        rightPanel.style.display = 'none';
-      }
-
-      // --- 2. Sync map view (pan/zoom/rotate)
-      let syncing = false;
-      function syncView(target, source) {
-        if (syncing) return;
-        syncing = true;
-        target.jumpTo({
-          center: source.getCenter(),
-          zoom: source.getZoom(),
-          bearing: source.getBearing(),
-          pitch: source.getPitch()
-        });
-        syncing = false;
-      }
-
-      leftMap.on('move', () => syncView(rightMap, leftMap));
-      rightMap.on('move', () => syncView(leftMap, rightMap));
-
-      // --- 3. Get control elements
-      const leftSlider = leftDoc.getElementById('slider');
-      const rightSlider = rightDoc.getElementById('slider');
-      const leftPlayPause = leftDoc.getElementById('playPause');
-      const rightPlayPause = rightDoc.getElementById('playPause');
-      const leftBack = leftDoc.getElementById('back');
-      const rightBack = rightDoc.getElementById('back');
-      const leftNext = leftDoc.getElementById('next');
-      const rightNext = rightDoc.getElementById('next');
-
-      // --- 4. Sync slider manual input
-      if (leftSlider && rightSlider) {
-        leftSlider.addEventListener('input', () => {
-          rightSlider.value = leftSlider.value;
-          rightSlider.dispatchEvent(new Event('input', { bubbles: true }));
-        });
-        
-        leftSlider.addEventListener('change', () => {
-          rightSlider.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-      }
-
-      // --- 5. Sync button clicks
-      if (leftPlayPause && rightPlayPause) {
-        leftPlayPause.addEventListener('click', () => {
-          rightPlayPause.click();
-        });
-      }
-
-      if (leftBack && rightBack) {
-        leftBack.addEventListener('click', () => {
-          rightBack.click();
-        });
-      }
-
-      if (leftNext && rightNext) {
-        leftNext.addEventListener('click', () => {
-          rightNext.click();
-        });
-      }
-
-      // --- 6. Animation-driven changes poll
-      let lastSliderValue = leftSlider.value;
-      setInterval(() => {
-        if (leftSlider.value !== lastSliderValue) {
-          lastSliderValue = leftSlider.value;
-          if (rightSlider.value !== leftSlider.value) {
-            rightWin.eval(`
-              const monthIndex = ${leftSlider.value};
-              currentMonth = monthIndex;
-              map.getSource('data').setTiles([getTileUrl(monthIndex)]);
-              document.getElementById('slider').value = monthIndex;
-              document.getElementById('legend-date').textContent = 'Date: ' + getDateLabel(monthIndex);
-            `);
-          }
-        }
-      }, 100);
-
-      console.log('Comparison maps and controls synced!');
-    }
-
-    [leftFrame, rightFrame].forEach(f => {
-      f.addEventListener('load', () => {
-        mapsReady++;
-        if (mapsReady === 2) setTimeout(setupSync, 1500);
-      });
-    });
-  </script>
 
   <div class="container">
     <div class="row">

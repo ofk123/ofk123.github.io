@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Argo velocity: server vs browser rendering</title>
+<link rel="icon" type="image/x-icon" href="/img/favicon/favicon.ico">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.17.0/dist/maplibre-gl.css">
+<style>
+  html, body { height: 100%; margin: 0; }
+  body { background: #0b0b0f; color: #111; overflow: hidden;
+         font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #maps { position: absolute; inset: 0; display: flex; }
+  .pane { position: relative; flex: 1; min-width: 0; }
+  .pane + .pane { border-left: 2px solid #3a3f4b; }
+  .map { position: absolute; inset: 0; }
+  .tag { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 3;
+         background: rgba(0, 0, 0, 0.72); color: #fff; padding: 4px 10px; border-radius: 4px;
+         font-size: 12px; text-align: center; white-space: nowrap; pointer-events: none; }
+  .tag small { display: block; color: #cbd5e1; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .panel { position: absolute; z-index: 4; background: rgba(255, 255, 255, 0.95); border-radius: 8px;
+           box-shadow: 0 2px 10px rgba(0, 0, 0, .35); padding: 10px 12px; }
+  #controls { left: 12px; bottom: 12px; width: 300px; }
+  #controls h1 { font-size: 13px; margin: 0 0 4px; }
+  .row { display: flex; align-items: center; gap: 6px; margin: 6px 0; }
+  .row > label { width: 64px; color: #555; flex: none; }
+  .seg { display: inline-flex; }
+  .seg button { border: 1px solid #999; background: #fff; padding: 2px 11px; cursor: pointer; font: inherit; }
+  .seg button:first-child { border-radius: 4px 0 0 4px; }
+  .seg button:last-child { border-radius: 0 4px 4px 0; border-left: none; }
+  .seg button[aria-pressed="true"] { background: #1f2937; color: #fff; border-color: #1f2937; }
+  input[type=range] { flex: 1; min-width: 0; }
+  #month-label { width: 70px; text-align: right; font-variant-numeric: tabular-nums; }
+  #play { font: inherit; padding: 2px 8px; cursor: pointer; }
+  #legend-bar { height: 10px; border-radius: 2px; margin-top: 2px; }
+  .legend-ticks { display: flex; justify-content: space-between; color: #444; font-size: 11px; }
+  .muted { color: #5b6270; font-size: 12px; }
+  #chart-panel { display: none; left: 324px; right: 12px; bottom: 12px; max-width: 980px; }
+  #close-chart { float: right; border: none; background: none; font-size: 16px; cursor: pointer; color: #555; }
+  .charts { display: flex; gap: 12px; margin-top: 4px; }
+  .chart-box { min-width: 0; }
+  .chart-box:first-child { flex: 2.4; }
+  .chart-box:last-child { flex: 1; }
+  .chart-box canvas { width: 100%; height: 210px; display: block; }
+  .chart-cap { color: #555; font-size: 12px; }
+  @media (max-width: 900px) {
+    #chart-panel { left: 12px; bottom: auto; top: 54px; }
+  }
+  @media (max-width: 700px) {
+    #maps { flex-direction: column; }
+    .pane + .pane { border-left: none; border-top: 2px solid #3a3f4b; }
+    #controls { left: 8px; right: 8px; width: auto; bottom: 8px; }
+    .charts { flex-direction: column; }
+    .chart-box canvas { height: 150px; }
+  }
+  /* compact layout when embedded in a short iframe */
+  @media (max-height: 480px) {
+    #controls { padding: 6px 9px; width: 270px; }
+    #controls .muted, #controls h1 { display: none; }
+    .row { margin: 3px 0; }
+    .chart-box canvas { height: 120px; }
+    #chart-panel { top: 46px; bottom: auto; right: 56px; }   /* keep the zoom buttons free */
+  }
+</style>
+</head>
+<body>
+<div id="maps">
+  <div class="pane">
+    <div class="tag">Server · xpublish-tiles renders PNG tiles<small id="left-time">&nbsp;</small></div>
+    <div id="left" class="map"></div>
+  </div>
+  <div class="pane">
+    <div class="tag">Browser · Zarr chunks drawn with WebGL<small id="right-time">&nbsp;</small></div>
+    <div id="right" class="map"></div>
+  </div>
+</div>
+
+<div id="controls" class="panel">
+  <h1>Absolute geostrophic velocity from Argo (GPR)</h1>
+  <div class="row"><label>Component</label>
+    <span class="seg"><button id="btn-u" aria-pressed="true">u (east)</button><button id="btn-v" aria-pressed="false">v (north)</button></span>
+  </div>
+  <div class="row"><label for="level">Pressure</label><select id="level"></select></div>
+  <div class="row"><label for="month">Month</label>
+    <input id="month" type="range" min="0" max="215" value="0"><span id="month-label"></span>
+  </div>
+  <div class="row"><label></label><button id="play">▶ Play</button>
+    <span style="margin-left:auto">± <input id="range" type="number" step="0.01" min="0.01" style="width:58px"> m/s</span>
+  </div>
+  <div id="legend-bar"></div>
+  <div class="legend-ticks"><span id="lo"></span><span>0 m/s</span><span id="hi"></span></div>
+  <div class="muted" style="margin-top:6px">Same Zarr data, two renderers. Click the ocean for its time series and profile.</div>
+</div>
+
+<div id="chart-panel" class="panel">
+  <button id="close-chart" title="Close">✕</button>
+  <div id="chart-title"></div>
+  <div class="charts">
+    <div class="chart-box"><div class="chart-cap" id="ts-cap"></div><canvas id="ts"></canvas></div>
+    <div class="chart-box"><div class="chart-cap" id="pr-cap"></div><canvas id="pr"></canvas></div>
+  </div>
+</div>
+
+<script type="module">
+import * as maplibregl from "https://unpkg.com/maplibre-gl@6.17.0/dist/maplibre-gl.mjs";
+import { ZarrLayer } from "https://esm.sh/@carbonplan/zarr-layer@0.12.0";
+import * as zarr from "https://esm.sh/zarrita@0.7.5";
+
+const params = new URLSearchParams(location.search);
+const SERVER = params.get("server") || "https://uvargotiles.onrender.com";
+const DATA = "https://pub-16fe89fa07db4eccb4b38b9ecbf17938.r2.dev/velocity/v0";
+const BASEMAP = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const EMBEDDED = window.self !== window.top;
+
+const LEVELS = [0, 5, 10, 20, 30, 50, 75, 100, 125, 150, 200, 250, 300, 400, 500, 600, 700,
+                800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000];
+const MONTHS = Array.from({ length: 216 }, (_, i) => new Date(Date.UTC(2004, i, 15)));
+// matplotlib RdBu_r, 64 steps: the server's style=raster/RdBu_r, so both sides use identical colors
+const RDBU_R = ["#053061", "#09386d", "#0e4179", "#124984", "#175290", "#1b5a9c", "#1f63a8", "#246aae",
+  "#2a71b2", "#2f79b5", "#3480b9", "#3a87bd", "#3f8ec0", "#4695c4", "#529dc8", "#5fa5cd", "#6eaed2",
+  "#7bb6d6", "#87beda", "#93c6de", "#9dcbe1", "#a7d0e4", "#b1d5e7", "#bbdaea", "#c5dfec", "#cde3ee",
+  "#d4e6f0", "#dbeaf2", "#e2edf3", "#e9f0f4", "#f0f3f5", "#f7f6f6", "#f8f4f2", "#f9eee7", "#fae8dd",
+  "#fbe3d3", "#fcddc8", "#fcd7be", "#fdd1b4", "#fccaa9", "#fac0a0", "#f8b796", "#f6ad8d", "#f4a383",
+  "#ef9a7b", "#e88b6e", "#e27d62", "#dc6f56", "#d6614b", "#cf5246", "#c74342", "#c0353e", "#b8263a",
+  "#b31a36", "#a8172f", "#9e1429", "#941023", "#8a0e1e", "#7f0b1b", "#760a1a", "#6c0819", "#620719",
+  "#580618", "#4e0517"];
+
+const state = { v: "u", level: 0, month: 0, range: null, playing: false };
+// deep links: ?v=v&level=1000&month=2010-07&at=-65,-58
+if (params.get("v") === "v") state.v = "v";
+if (LEVELS.includes(+params.get("level"))) state.level = +params.get("level");
+const ym = /^(\d{4})-(\d{2})$/.exec(params.get("month") || "");
+if (ym) state.month = Math.min(215, Math.max(0, (+ym[1] - 2004) * 12 + (+ym[2] - 1)));
+const atParam = (params.get("at") || "").split(",").map(Number);
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const finite = x => x != null && Number.isFinite(x);
+const defaultRange = p => p <= 50 ? 0.3 : p <= 200 ? 0.2 : p <= 500 ? 0.1 : p <= 1000 ? 0.06 : 0.04;
+const R = () => state.range ?? defaultRange(state.level);
+const levelIndex = () => LEVELS.indexOf(state.level);
+const ymd = d => d.toISOString().slice(0, 10);
+const monthLabel = d => d.toLocaleString("en", { month: "short", year: "numeric", timeZone: "UTC" });
+const fmtLat = y => `${Math.abs(y).toFixed(2)}°${y < 0 ? "S" : "N"}`;
+const fmtLon = x => `${Math.abs(x).toFixed(2)}°${x < 0 ? "W" : "E"}`;
+const seconds = ms => ms < 100 ? "instant" : `${(ms / 1000).toFixed(1)} s`;
+
+// ---------- the two maps ----------
+function makeMap(container, nav) {
+  const m = new maplibregl.Map({
+    container, style: BASEMAP, center: [-40, -45], zoom: EMBEDDED ? 1.1 : 1.5, maxZoom: 6,
+    attributionControl: { compact: true }, cooperativeGestures: EMBEDDED,
+  });
+  if (nav) m.addControl(new maplibregl.NavigationControl(), "top-right");
+  return m;
+}
+function prepareBasemap(m) {
+  m.setProjection({ type: "globe" });
+  for (const l of m.getStyle().layers) {
+    if (l.type === "symbol" || l.type === "line") m.setLayoutProperty(l.id, "visibility", "none");
+  }
+}
+const left = makeMap("left", false);
+const right = makeMap("right", true);
+
+let syncing = false;
+for (const [a, b] of [[left, right], [right, left]]) {
+  a.on("move", () => {
+    if (syncing) return;
+    syncing = true;
+    b.jumpTo({ center: a.getCenter(), zoom: a.getZoom(), bearing: a.getBearing(), pitch: a.getPitch() });
+    syncing = false;
+  });
+}
+
+// Left: PNG tiles rendered by xpublish-tiles from maps.zarr
+function tileUrl() {
+  const q = new URLSearchParams({
+    variables: state.v, time: `nearest::${ymd(MONTHS[state.month])}`, pressure: state.level,
+    style: "raster/RdBu_r", colorscalerange: `${-R()},${R()}`, width: 256, height: 256, f: "image/png",
+  });
+  return `${SERVER}/datasets/maps/tiles/WebMercatorQuad/{z}/{y}/{x}?${q}`;
+}
+left.on("style.load", () => {
+  prepareBasemap(left);
+  left.addSource("server", { type: "raster", tiles: [tileUrl()], tileSize: 256, maxzoom: 6 });
+  left.addLayer({ id: "server", type: "raster", source: "server", paint: { "raster-fade-duration": 0 } });
+  newFrame();
+});
+
+// Right: the browser reads maps.zarr chunks from R2 and colors them on the GPU
+let rightLoading = false;
+const rightWaiters = [];
+const browserLayer = new ZarrLayer({
+  id: "browser",
+  source: `${DATA}/maps.zarr`,
+  variable: state.v,
+  colormap: RDBU_R,
+  clim: [-R(), R()],
+  selector: selector(),
+  zarrVersion: 3,
+  maxCacheMB: 192,
+  onLoadingStateChange: s => {
+    rightLoading = typeof s === "boolean" ? s : !!s?.loading;
+    if (s?.error) console.warn("zarr-layer:", s.error);
+    if (!rightLoading) rightWaiters.splice(0).forEach(fn => fn());
+  },
+});
+function selector() {
+  return { time: { selected: state.month, type: "index" }, pressure: { selected: levelIndex(), type: "index" } };
+}
+right.on("style.load", () => { prepareBasemap(right); right.addLayer(browserLayer); });
+
+// ---------- one "frame" = both maps showing the current variable / level / month ----------
+let frameId = 0;
+function waitLeft() {
+  return new Promise(res => { left.once("idle", res); setTimeout(res, 20000); });
+}
+function waitRight() {
+  return new Promise(res => setTimeout(() => {
+    if (!rightLoading) return res();
+    rightWaiters.push(res);
+    setTimeout(res, 20000);
+  }, 60));
+}
+function newFrame() {
+  const id = ++frameId, t0 = performance.now();
+  $("left-time").textContent = "rendering…";
+  $("right-time").textContent = "loading…";
+  const l = waitLeft().then(() => { if (id === frameId) $("left-time").textContent = `frame ${seconds(performance.now() - t0)}`; });
+  const r = waitRight().then(() => { if (id === frameId) $("right-time").textContent = `frame ${seconds(performance.now() - t0)}`; });
+  return Promise.all([l, r]);
+}
+function render({ variableChanged = false } = {}) {
+  $("month-label").textContent = monthLabel(MONTHS[state.month]);
+  $("range").value = R();
+  $("lo").textContent = `${-R()}`;
+  $("hi").textContent = `+${R()}`;
+  left.getSource("server")?.setTiles([tileUrl()]);
+  if (variableChanged) browserLayer.setVariable(state.v).then(() => browserLayer.setSelector(selector()));
+  else browserLayer.setSelector(selector());
+  browserLayer.setClim([-R(), R()]);
+  if (section) drawCharts();
+  return newFrame();
+}
+
+// ---------- controls ----------
+$("legend-bar").style.background = `linear-gradient(to right, ${RDBU_R.join(", ")})`;
+for (const p of LEVELS) $("level").add(new Option(`${p} dbar`, p));
+function setVar(v) {
+  state.v = v;
+  $("btn-u").setAttribute("aria-pressed", v === "u");
+  $("btn-v").setAttribute("aria-pressed", v === "v");
+  render({ variableChanged: true });
+  if (lastClick) loadSection();
+}
+$("btn-u").onclick = () => setVar("u");
+$("btn-v").onclick = () => setVar("v");
+$("level").onchange = e => { state.level = +e.target.value; state.range = null; render(); };
+$("range").onchange = e => { const r = +e.target.value; if (r > 0) { state.range = r; render(); } };
+let monthTimer;
+$("month").oninput = e => {
+  state.month = +e.target.value;
+  $("month-label").textContent = monthLabel(MONTHS[state.month]);
+  if (section) drawCharts();                 // charts follow the slider at once
+  clearTimeout(monthTimer);
+  monthTimer = setTimeout(render, 200);      // maps once the slider rests
+};
+async function play() {
+  while (state.playing) {
+    if (document.hidden) { await sleep(500); continue; }
+    state.month = (state.month + 1) % MONTHS.length;
+    $("month").value = state.month;
+    await render();                          // wait until both maps show this month
+    await sleep(600);
+  }
+}
+$("play").onclick = () => {
+  state.playing = !state.playing;
+  $("play").textContent = state.playing ? "⏸ Pause" : "▶ Play";
+  if (state.playing) play();
+};
+$("level").value = state.level;
+$("month").value = state.month;
+$("btn-u").setAttribute("aria-pressed", state.v === "u");
+$("btn-v").setAttribute("aria-pressed", state.v === "v");
+$("month-label").textContent = monthLabel(MONTHS[state.month]);
+$("range").value = R();
+$("lo").textContent = `${-R()}`;
+$("hi").textContent = `+${R()}`;
+if (params.get("play") === "1") $("play").click();
+
+// ---------- click: time series + profile, read both ways ----------
+const seriesRoot = zarr.root(new zarr.FetchStore(`${DATA}/series.zarr`));
+const arrays = {};
+const openArray = name => (arrays[name] ??= zarr.open(seriesRoot.resolve(name), { kind: "array" }));
+let lastClick = null, section = null;
+const markers = [left, right].map(m => ({ map: m, marker: new maplibregl.Marker({ color: "#facc15", scale: 0.7 }) }));
+for (const m of [left, right]) m.on("click", e => { lastClick = e.lngLat.wrap(); loadSection(); });
+$("close-chart").onclick = () => {
+  $("chart-panel").style.display = "none"; section = null; lastClick = null;
+  markers.forEach(({ marker }) => marker.remove());
+};
+window.addEventListener("resize", () => section && drawCharts());
+if (atParam.length === 2 && atParam.every(Number.isFinite)) {
+  lastClick = new maplibregl.LngLat(atParam[0], atParam[1]).wrap();
+  left.once("load", () => { left.jumpTo({ center: [lastClick.lng, lastClick.lat] }); loadSection(); });
+}
+
+// Browser: one chunk of series.zarr (216 months x 30 levels x 6x6 cells) holds the whole section
+async function browserSection(v, lng, lat) {
+  const t0 = performance.now();
+  const iy = Math.min(719, Math.max(0, Math.round((lat + 90) / 0.25)));       // nearest grid node
+  const ix = ((Math.round((lng + 180) / 0.25) % 1440) + 1440) % 1440;
+  const [a, s] = await Promise.all([openArray(v), openArray(`${v}_std`)]);
+  const [ya, sa] = await Promise.all([zarr.get(a, [null, null, iy, ix]), zarr.get(s, [null, null, iy, ix])]);
+  return { y: Array.from(ya.data), sd: Array.from(sa.data), ms: performance.now() - t0 };
+}
+
+// Server: the same section through xpublish-tiles' WMS GetTimeseries over all levels
+async function serverSection(v, lng, lat) {
+  const t0 = performance.now(), eps = 0.001;
+  const q = new URLSearchParams({
+    service: "WMS", version: "1.3.0", request: "GetTimeseries", query_layers: `${v},${v}_std`,
+    crs: "CRS:84", bbox: [lng - eps, lat - eps, lng + eps, lat + eps].join(","),
+    width: 1, height: 1, i: 0, j: 0, elevation: `${LEVELS[0]}/${LEVELS[LEVELS.length - 1]}`,
+  });
+  const r = await fetch(`${SERVER}/datasets/series/wms?${q}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const cov = await r.json();
+  const toTZ = rng => {                           // normalize to time-major [216, 30]
+    if (rng.axisNames[0] === "t") return rng.values;
+    const [nz, nt] = rng.shape, out = new Array(nt * nz);
+    for (let z = 0; z < nz; z++) for (let t = 0; t < nt; t++) out[t * nz + z] = rng.values[z * nt + t];
+    return out;
+  };
+  return { y: toTZ(cov.ranges[v]), sd: toTZ(cov.ranges[`${v}_std`]), ms: performance.now() - t0 };
+}
+
+async function loadSection() {
+  const { lng, lat } = lastClick, v = state.v;
+  markers.forEach(({ map, marker }) => marker.setLngLat([lng, lat]).addTo(map));
+  $("chart-panel").style.display = "block";
+  $("chart-title").textContent = "Loading…";
+  const [b, s] = await Promise.allSettled([browserSection(v, lng, lat), serverSection(v, lng, lat)]);
+  if (lastClick?.lng !== lng || lastClick?.lat !== lat || state.v !== v) return;   // a newer click won
+  const use = b.status === "fulfilled" ? b.value : s.status === "fulfilled" ? s.value : null;
+  if (!use) { $("chart-title").textContent = "Could not load data for this point."; section = null; return; }
+  let agree = "";
+  if (b.status === "fulfilled" && s.status === "fulfilled") {
+    let maxDiff = 0, nanMismatch = false;
+    b.value.y.forEach((val, i) => {
+      const w = s.value.y[i];
+      if (!finite(val) || !finite(w)) { if (finite(val) !== finite(w)) nanMismatch = true; return; }
+      maxDiff = Math.max(maxDiff, Math.abs(val - w));
+    });
+    agree = !nanMismatch && maxDiff === 0 ? " · identical values ✓" : ` · max difference ${maxDiff.toExponential(1)}`;
+  }
+  const timing = [
+    b.status === "fulfilled" ? `browser read ${seconds(b.value.ms)}` : "browser read failed",
+    s.status === "fulfilled" ? `server query ${seconds(s.value.ms)}` : "server query failed",
+  ].join(" · ");
+  section = { v, lat, lng, y: use.y, sd: use.sd, note: timing + agree };
+  drawCharts();
+}
+
+// ---------- charts ----------
+const at = (arr, ti, zi) => arr[ti * LEVELS.length + zi];
+function niceTicks(lo, hi, n) {
+  const raw = (hi - lo) / n, mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 5, 10].map(m => m * mag).find(s => raw <= s);
+  const ticks = [];
+  for (let x = Math.ceil(lo / step) * step; x <= hi + 1e-12; x += step) ticks.push(+x.toFixed(10));
+  return { ticks, dec: Math.max(0, -Math.floor(Math.log10(step))) };
+}
+function canvas2d(id) {
+  const c = $(id), dpr = window.devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
+  c.width = W * dpr; c.height = H * dpr;
+  const g = c.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  g.font = "11px system-ui, sans-serif"; g.lineWidth = 1;
+  return { g, W, H };
+}
+function extent(points) {
+  const lo = [], hi = [];
+  for (const [val, s] of points) if (finite(val)) { lo.push(val - 2 * (s ?? 0)); hi.push(val + 2 * (s ?? 0)); }
+  if (!lo.length) return null;
+  const a = Math.min(...lo, 0), b = Math.max(...hi, 0), pad = (b - a) * 0.06 || 0.01;
+  return [a - pad, b + pad];
+}
+function drawCharts() {
+  const { v, lat, lng, y, sd, note } = section;
+  const zi = levelIndex(), ti = state.month;
+  const ts = MONTHS.map((_, i) => [at(y, i, zi), at(sd, i, zi)]);
+  const pr = LEVELS.map((_, k) => [at(y, ti, k), at(sd, ti, k)]);
+  const ex = extent([...ts, ...pr]);
+  if (!ex) { $("chart-title").textContent = "No data at this point (land or outside the product)."; return; }
+  $("chart-title").innerHTML = `<b>${v}</b> at ${fmtLat(lat)}, ${fmtLon(lng)} ` +
+    `<span class="muted">· line: GPR estimate · band: ±2σ small-scale GPR uncertainty · ${note}</span>`;
+  $("ts-cap").textContent = `Time series at ${state.level} dbar (m/s)`;
+  $("pr-cap").textContent = `Profile in ${monthLabel(MONTHS[ti])} (m/s)`;
+  drawSeries(ts, ex);
+  drawProfile(pr, ex);
+}
+function drawSeries(pts, [vmin, vmax]) {
+  const { g, W, H } = canvas2d("ts"), n = pts.length, P = { l: 46, r: 8, t: 6, b: 20 };
+  const X = i => P.l + (W - P.l - P.r) * i / (n - 1);
+  const Y = val => P.t + (H - P.t - P.b) * (vmax - val) / (vmax - vmin);
+  const { ticks, dec } = niceTicks(vmin, vmax, 5);
+  for (const val of ticks) {
+    g.strokeStyle = val === 0 ? "#9ca3af" : "#e5e7eb";
+    g.beginPath(); g.moveTo(P.l, Y(val)); g.lineTo(W - P.r, Y(val)); g.stroke();
+    g.fillStyle = "#555"; g.fillText(val.toFixed(dec), 4, Y(val) + 4);
+  }
+  for (let i = 0; i < n; i += 24) g.fillText(MONTHS[i].getUTCFullYear(), X(i) - 13, H - 5);
+  band(g, pts, (i, val) => [X(i), Y(val)]);
+  line(g, pts, (i, val) => [X(i), Y(val)]);
+  dashed(g, X(state.month), P.t, X(state.month), H - P.b);
+}
+function drawProfile(pts, [vmin, vmax]) {
+  const { g, W, H } = canvas2d("pr"), P = { l: 40, r: 8, t: 6, b: 20 }, zmax = LEVELS[LEVELS.length - 1];
+  const X = val => P.l + (W - P.l - P.r) * (val - vmin) / (vmax - vmin);
+  const Y = p => P.t + (H - P.t - P.b) * p / zmax;
+  const { ticks, dec } = niceTicks(vmin, vmax, 3);
+  for (const val of ticks) {
+    g.strokeStyle = val === 0 ? "#9ca3af" : "#e5e7eb";
+    g.beginPath(); g.moveTo(X(val), P.t); g.lineTo(X(val), H - P.b); g.stroke();
+    g.fillStyle = "#555"; g.fillText(val.toFixed(dec), X(val) - 10, H - 5);
+  }
+  for (const p of [0, 500, 1000, 1500, 2000]) g.fillText(p, 4, Y(p) + 4);
+  band(g, pts, (k, val) => [X(val), Y(LEVELS[k])]);
+  line(g, pts, (k, val) => [X(val), Y(LEVELS[k])]);
+  dashed(g, P.l, Y(state.level), W - P.r, Y(state.level));
+}
+function band(g, pts, xy) {                 // ±2σ band between valid neighbours
+  g.fillStyle = "rgba(37, 99, 235, 0.18)";
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [a, sa] = pts[i], [b, sb] = pts[i + 1];
+    if (!finite(a) || !finite(b)) continue;
+    const p1 = xy(i, a + 2 * (sa ?? 0)), p2 = xy(i + 1, b + 2 * (sb ?? 0));
+    const p3 = xy(i + 1, b - 2 * (sb ?? 0)), p4 = xy(i, a - 2 * (sa ?? 0));
+    g.beginPath(); g.moveTo(...p1); g.lineTo(...p2); g.lineTo(...p3); g.lineTo(...p4); g.closePath(); g.fill();
+  }
+}
+function line(g, pts, xy) {
+  g.strokeStyle = "#1d4ed8"; g.lineWidth = 1.6; g.beginPath();
+  let pen = false;
+  pts.forEach(([val], i) => {
+    if (!finite(val)) { pen = false; return; }
+    const [x, yy] = xy(i, val);
+    pen ? g.lineTo(x, yy) : g.moveTo(x, yy); pen = true;
+  });
+  g.stroke(); g.lineWidth = 1;
+}
+function dashed(g, x1, y1, x2, y2) {         // red dashes: the month / level shown on the maps
+  g.strokeStyle = "#dc2626"; g.setLineDash([4, 3]);
+  g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); g.setLineDash([]);
+}
+</script>
+</body>
+</html>
