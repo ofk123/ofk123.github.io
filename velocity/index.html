@@ -355,7 +355,7 @@ async function loadSection() {
       if (!finite(val) || !finite(w)) { if (finite(val) !== finite(w)) nanMismatch = true; return; }
       maxDiff = Math.max(maxDiff, Math.abs(val - w));
     });
-    agree = !nanMismatch && maxDiff === 0 ? ",  " : ` · max difference ${maxDiff.toExponential(1)}`;
+    agree = !nanMismatch && maxDiff === 0 ? "" : ` · max difference ${maxDiff.toExponential(1)}`;
   }
   const timing = [
     b.status === "fulfilled" ? `browser read ${seconds(b.value.ms)}` : "browser read failed",
