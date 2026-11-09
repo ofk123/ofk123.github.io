@@ -66,17 +66,17 @@
 <body>
 <div id="maps">
   <div class="pane">
-    <div class="tag">Server · xpublish-tiles renders PNG tiles<small id="left-time">&nbsp;</small></div>
+    <div class="tag">Server,  xpublish-tiles rendering PNG tiles<small id="left-time">&nbsp;</small></div>
     <div id="left" class="map"></div>
   </div>
   <div class="pane">
-    <div class="tag">Browser · Zarr chunks drawn with WebGL<small id="right-time">&nbsp;</small></div>
+    <div class="tag">Browser zarr chunks drawn with WebGL<small id="right-time">&nbsp;</small></div>
     <div id="right" class="map"></div>
   </div>
 </div>
 
 <div id="controls" class="panel">
-  <h1>Absolute geostrophic velocity from Argo (GPR)</h1>
+  <h1>AGVA</h1>
   <div class="row"><label>Component</label>
     <span class="seg"><button id="btn-u" aria-pressed="true">u (east)</button><button id="btn-v" aria-pressed="false">v (north)</button></span>
   </div>
@@ -89,7 +89,7 @@
   </div>
   <div id="legend-bar"></div>
   <div class="legend-ticks"><span id="lo"></span><span>0 m/s</span><span id="hi"></span></div>
-  <div class="muted" style="margin-top:6px">Same Zarr data, two renderers. Click the ocean for its time series and profile.</div>
+  <div class="muted" style="margin-top:6px">Same zarr data in both views. Click in ocean for time-series and vertical profile.</div>
 </div>
 
 <div id="chart-panel" class="panel">
@@ -287,7 +287,6 @@ $("month-label").textContent = monthLabel(MONTHS[state.month]);
 $("range").value = R();
 $("lo").textContent = `${-R()}`;
 $("hi").textContent = `+${R()}`;
-if (params.get("play") === "1") $("play").click();
 
 // ---------- click: time series + profile, read both ways ----------
 const seriesRoot = zarr.root(new zarr.FetchStore(`${DATA}/series.zarr`));
@@ -305,6 +304,9 @@ if (atParam.length === 2 && atParam.every(Number.isFinite)) {
   lastClick = new maplibregl.LngLat(atParam[0], atParam[1]).wrap();
   left.once("load", () => { left.jumpTo({ center: [lastClick.lng, lastClick.lat] }); loadSection(); });
 }
+if (params.get("play") === "1")                 // ?play=1: start once both maps are ready
+  Promise.all([left, right].map(m => new Promise(res => m.once("load", res))))
+    .then(() => { if (!state.playing) $("play").click(); });
 
 // Browser: one chunk of series.zarr (216 months x 30 levels x 6x6 cells) holds the whole section
 async function browserSection(v, lng, lat) {
@@ -353,7 +355,7 @@ async function loadSection() {
       if (!finite(val) || !finite(w)) { if (finite(val) !== finite(w)) nanMismatch = true; return; }
       maxDiff = Math.max(maxDiff, Math.abs(val - w));
     });
-    agree = !nanMismatch && maxDiff === 0 ? " · identical values ✓" : ` · max difference ${maxDiff.toExponential(1)}`;
+    agree = !nanMismatch && maxDiff === 0 ? ",  " : ` · max difference ${maxDiff.toExponential(1)}`;
   }
   const timing = [
     b.status === "fulfilled" ? `browser read ${seconds(b.value.ms)}` : "browser read failed",
@@ -393,9 +395,9 @@ function drawCharts() {
   const ts = MONTHS.map((_, i) => [at(y, i, zi), at(sd, i, zi)]);
   const pr = LEVELS.map((_, k) => [at(y, ti, k), at(sd, ti, k)]);
   const ex = extent([...ts, ...pr]);
-  if (!ex) { $("chart-title").textContent = "No data at this point (land or outside the product)."; return; }
+  if (!ex) { $("chart-title").textContent = "No data at this point (land / outside bounds)."; return; }
   $("chart-title").innerHTML = `<b>${v}</b> at ${fmtLat(lat)}, ${fmtLon(lng)} ` +
-    `<span class="muted">· line: GPR estimate · band: ±2σ small-scale GPR uncertainty · ${note}</span>`;
+    `<span class="muted">· line: estimate,  band: ±2 sqrt(MSE) small-scale uncertainty · ${note}</span>`;
   $("ts-cap").textContent = `Time series at ${state.level} dbar (m/s)`;
   $("pr-cap").textContent = `Profile in ${monthLabel(MONTHS[ti])} (m/s)`;
   drawSeries(ts, ex);
